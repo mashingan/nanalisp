@@ -57,6 +57,16 @@ macro FAILCHK {
         pop     eax
 }
 
+macro memalloc allocsize {
+        invoke  HeapAlloc, [procHeap], HEAPFLAG, allocsize
+        FAILCHK
+}
+
+macro memfree memlocation {
+        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, memlocation
+        FAILCHK
+}
+
 HEAPFLAG    equ HEAP_ZERO_MEMORY + HEAP_NO_SERIALIZE
 
 calcprnths  dd  0
@@ -105,8 +115,7 @@ macro toMakelist [thetype, thename, additional] {
 
 proc makelist uses esi edi ebx ecx, thestring
         local   header:DWORD, len:DWORD, tempbuffer:DWORD, lenElm:DWORD
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, MAXBUFFER shl 1
-        FAILCHK
+        memalloc MAXBUFFER shl 1
         mov     [lenElm], 0
         mov     [tempbuffer], eax
         inc     [calcprnths]
@@ -115,8 +124,7 @@ proc makelist uses esi edi ebx ecx, thestring
         sub     eax, 4
         inc2    esi
         mov     ecx, eax
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NODE
-        FAILCHK
+        memalloc sizeof.NODE
         mov     [header], eax
     .startloop:
         cmp     ecx, 0
@@ -155,8 +163,7 @@ proc makelist uses esi edi ebx ecx, thestring
         sub     ecx, eax
         jnz     .startloop
     .endloop:
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, [tempbuffer]
-        FAILCHK
+        memfree [tempbuffer]
         mov     eax, [header]
         mov     ebx, [lenElm]
         mov     [eax+NODE.length], ebx
@@ -229,8 +236,7 @@ proc allocateString uses esi edi ebx ecx edx, instr
         mov     [allocsize], 8
         lea     eax, [eax*2]
         add     [allocsize], eax
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, dword [allocsize]
-        FAILCHK
+        memalloc dword [allocsize]
         mov     edx, eax
         mov     edi, eax
         mov     eax, [len]
@@ -245,14 +251,12 @@ endp
 
 proc allocateSymbol uses esi ebx ecx edx, instr
         mov     esi, [instr]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.SYMBOLSTRUCT
-        FAILCHK
+        memalloc sizeof.SYMBOLSTRUCT
         mov     ebx, eax
         mov     dword [ebx+SYMBOLSTRUCT.hMemory], eax
         stdcall allocateString, esi
         mov     dword [ebx+SYMBOLSTRUCT.hString], eax
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.VARIABLESTRUCT
-        FAILCHK
+        memalloc sizeof.VARIABLESTRUCT
         stdcall allocateVariable, NULL
         mov     dword [ebx+SYMBOLSTRUCT.hVars], eax
         mov     eax, ebx
@@ -264,16 +268,14 @@ proc allocateNumber uses esi ebx ecx edx, strvalue, valtype
         mov     esi, [strvalue]
         invoke  lstrlenW, esi
         mov     [len], eax
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NUMBERSTRUCT
-        FAILCHK
+        memalloc sizeof.NUMBERSTRUCT
         mov     ebx, eax
         mov     dword [eax+NUMBERSTRUCT.hNumber], eax
         mov     edx, [valtype]
         mov     dword [eax+NUMBERSTRUCT.type], edx
         cmp     edx, INTEGER
         jne     @f
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, 4
-        FAILCHK
+        memalloc 4
         mov     dword [ebx+NUMBERSTRUCT.value], eax
         stdcall convertToInt, esi, [len]
         mov     ecx, dword [ebx+NUMBERSTRUCT.value]
@@ -282,8 +284,7 @@ proc allocateNumber uses esi ebx ecx edx, strvalue, valtype
     @@:
         cmp     dword [valtype], FLOAT
         jne     @f
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, 8
-        FAILCHK
+        memalloc 8
         mov     dword [ebx+NUMBERSTRUCT.value], eax
         stdcall convertToDouble, esi, [len]
         mov     edx, dword [ebx+NUMBERSTRUCT.value]
@@ -297,8 +298,7 @@ endp
 
 macro allocNumber thetype {
         xor     ecx, ecx
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NUMBERSTRUCT
-        FAILCHK
+        memalloc sizeof.NUMBERSTRUCT
         mov     ebx, eax
         mov     [ebx+NUMBERSTRUCT.hNumber], eax
     if thetype eq INTEGER
@@ -307,8 +307,7 @@ macro allocNumber thetype {
         mov     ecx, 8
     end if
         mov     [ebx+NUMBERSTRUCT.type], thetype
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, ecx
-        FAILCHK
+        memalloc ecx
         mov     [ebx+NUMBERSTRUCT.value], eax
 }
 
@@ -334,8 +333,7 @@ endp
 proc allocateChar uses esi ebx ecx edx, charstr
         xor     eax, eax
         mov     esi, [charstr]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.CHARSTRUCT
-        FAILCHK
+        memalloc sizeof.CHARSTRUCT
         mov     ebx, eax
         mov     [ebx+CHARSTRUCT.hMemory], eax
         stdcall allocateString, esi
@@ -347,8 +345,7 @@ endp
 proc allocateNode uses esi ebx ecx edx, value, valtype
         xor     eax, eax
         xor     ecx, ecx
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NODE
-        FAILCHK
+        memalloc sizeof.NODE
         mov     ebx, eax
         mov     esi, [value]
         mov     dword [eax+NODE.value], esi
@@ -360,8 +357,7 @@ endp
 
 proc allocateVariable uses esi ebx ecx edx, symbolnode
         mov     esi, [symbolnode]
-        invoke  HeapAlloc,[procHeap],HEAPFLAG,sizeof.VARIABLESTRUCT
-        FAILCHK
+        memalloc sizeof.VARIABLESTRUCT
         mov     ebx, eax
         xor     eax, eax
         cmp     esi, NULL
@@ -549,9 +545,7 @@ proc removeNode uses esi eax ecx edx, thenode
             FUNCTION, Function
     .finish:
         mov     ecx, [esi+NODE.hMemory]
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, ecx
-        ;invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, esi
-        FAILCHK
+        memfree ecx
     .exit:
         ret
 endp
@@ -559,8 +553,7 @@ endp
 proc removeString uses esi eax ecx edx, thestring
         cmp     [thestring], NULL
         je      @f
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, [thestring]
-        FAILCHK
+        memfree [thestring]
     @@:
         ret
 endp
@@ -570,10 +563,8 @@ proc removeChar uses esi eax ecx edx, thechar
         je      @f
         mov     esi, [thechar]
         mov     eax, [esi+CHARSTRUCT.hString]
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, eax
-        FAILCHK
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, esi
-        FAILCHK
+        memfree eax
+        memfree esi
     @@:
         ret
 endp
@@ -592,8 +583,7 @@ proc removeSymbol uses esi eax ebx ecx edx, thesymbol
         je      @f
         stdcall removeVariable, edx
     @@:
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, esi
-        FAILCHK
+        memfree esi
    .exit:
         ret
 endp
@@ -604,11 +594,9 @@ proc removeNumber uses esi eax ebx ecx edx, thenumber
         mov     eax, [thenumber]
         mov     ebx, eax
         mov     ecx, [eax+NUMBERSTRUCT.value]
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, ecx
-        FAILCHK
+        memfree ecx
         ;mov     eax, [ebx+NUMBERSTRUCT.hNumber]
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, ebx
-        FAILCHK
+        memfree ebx
     @@:
         ret
 endp
@@ -664,8 +652,7 @@ proc removeVariable uses esi eax ebx ecx edx, thevariable
         je      @f
         stdcall removeNode, ebx
     @@:
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, esi
-        FAILCHK
+        memfree esi
     .exit:
         ret
 endp
@@ -678,8 +665,7 @@ proc removeLambda uses esi eax ecx edx, thelambda
         mov     edx, [eax+LAMBDASTRUCT.hExpr]
         stdcall removeVariable, ecx
         stdcall removeNode, edx
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, eax
-        FAILCHK
+        memfree eax
     @@:
         ret
 endp
@@ -688,8 +674,7 @@ proc removeFunction uses esi eax ecx edx, thefunction
         mov     eax, [thefunction]
         cmp     eax, 0
         je      @f
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, eax
-        FAILCHK
+        memfree eax
     @@:
         ret
 endp
@@ -714,8 +699,7 @@ proc cpyString uses esi edi ebx ecx edx, strstruct
         mov     ebx, eax
         add     eax, 8
         lea     eax, [eax*2]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, eax
-        FAILCHK
+        memalloc eax
         mov     edi, eax
         movsd               ; copying size from esi
         mov     [edi], eax  ; putting the hStr
@@ -728,15 +712,13 @@ endp
 
 proc cpySymbol uses esi edi ebx ecx edx, symstruct
         mov     esi, [symstruct]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.SYMBOLSTRUCT
-        FAILCHK
+        memalloc sizeof.SYMBOLSTRUCT
         mov     edi, eax
         mov     dword [edi+SYMBOLSTRUCT.hMemory], eax
         mov     ebx, dword [esi+SYMBOLSTRUCT.hString]
         stdcall cpyString, ebx
         mov     dword [edi+SYMBOLSTRUCT.hString], eax
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.VARIABLESTRUCT
-        FAILCHK
+        memalloc sizeof.VARIABLESTRUCT
         mov     dword [edi+SYMBOLSTRUCT.hVars], eax
         mov     eax, edi
         ret
@@ -744,8 +726,7 @@ endp
 
 proc cpyChar uses esi edi ebx ecx edx, charstruct
         mov     esi, [charstruct]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.CHARSTRUCT
-        FAILCHK
+        memalloc sizeof.CHARSTRUCT
         mov     edi, eax
         mov     dword [edi+CHARSTRUCT.hMemory], eax
         mov     ebx, dword [esi+CHARSTRUCT.hString]
@@ -758,8 +739,7 @@ endp
 proc cpyNumber uses esi edi ebx ecx edx, numstruct
         mov     esi, [numstruct]
         mov     ecx, sizeof.NUMBERSTRUCT
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, ecx
-        FAILCHK
+        memalloc ecx
         mov     ebx, eax
         mov     edi, eax
         mov     dword [edi+NUMBERSTRUCT.hNumber], eax
@@ -767,16 +747,14 @@ proc cpyNumber uses esi edi ebx ecx edx, numstruct
         mov     dword [edi+NUMBERSTRUCT.type], edx
         cmp     edx, INTEGER
         jne     @f
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, 4
-        FAILCHK
+        memalloc 4
         mov     dword [edi+NUMBERSTRUCT.value], eax
         mov     edi, eax
         mov     esi, [esi+NUMBERSTRUCT.value]
         movsd
         jmp     .to_exit
     @@:
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, 8
-        FAILCHK
+        memalloc 8
         mov     [edi+NUMBERSTRUCT.value], eax
         mov     edi, eax
         mov     esi, [esi+NUMBERSTRUCT.value]
@@ -792,8 +770,7 @@ endp
 proc cpyVariables uses esi edi ebx ecx edx, vartable
         local table:DWORD
         mov     esi, [vartable]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.VARIABLESTRUCT
-        FAILCHK
+        memalloc sizeof.VARIABLESTRUCT
         mov     [table], eax
         cmp     esi, 0
         je      .exit
@@ -812,8 +789,7 @@ endp
 
 proc cpyLambda uses esi edi ebx ecx edx, lambdastruct
         mov     esi, [lambdastruct]
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.LAMBDASTRUCT
-        FAILCHK
+        memalloc sizeof.LAMBDASTRUCT
         mov     ebx, eax
         mov     [ebx+LAMBDASTRUCT.hMemory], eax
         cmp     esi, 0
@@ -858,8 +834,7 @@ proc cpyList uses esi ebx ecx edx, listheader
         cmp     [listheader], NULL
         je      .exit
         local   header:DWORD
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NODE
-        FAILCHK
+        memalloc sizeof.NODE
         mov     [header], eax
         mov     esi, [listheader]
         mov     ebx, esi
