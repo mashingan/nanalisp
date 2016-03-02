@@ -83,9 +83,31 @@ include 'variables.inc'
         ;du  '(cond ((null? x) null)'
         ;du  '(true (cons (cons (car x) (quote ())) (hello (cdr x)))))))'
         ;du  '(hello (quote (1 2))))',0
-str1 du '(begin (setq 1+ (lambda (x) (+ x 1))'
+;str1 du '(begin (setq 1+ (lambda (x) (+ x 1))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (1+ (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1 du '(begin (setq x-1 (lambda (x) (- x 1))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (x-1 (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1    du  '(- 3 2 1)',0
+;str1    du  '(- 3)',0
+;str1    du  '((- 1) 2)',0
+;str1    du  '(* 3 2 1)',0
+;str1    du  '(* 3.5 2.5 1)',0
+;str1    du  '(* 3)',0
+;str1    du  '((* 1) 2)',0
+;str1 du '(begin (setq *2.5 (lambda (x) (* x 2.5))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (*2.5 (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1 du '(/ 10 2 2)',0
+;str1 du '(/ 10)',0
+;str1 du '((/ 10) 2)',0
+str1 du '(begin (setq /2.5 (lambda (x) (/ x 2.5))'
      du ' hello (lambda (x) (cond ((null? x) (quote ()))'
-     du ' (true (cons (1+ (car x)) (hello (cdr x)))))))'
+     du ' (true (cons (/2.5 (car x)) (hello (cdr x)))))))'
      du ' (hello (quote (1 2 3 4))))',0
 lenstr1 = $ - str1
 ;str1    du  '1.45e10',0

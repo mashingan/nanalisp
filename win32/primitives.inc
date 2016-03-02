@@ -24,6 +24,9 @@ equalvaluename2 du 'equal',0
 condname    du  'cond',0
 displayname du  'display',0
 addnumname  du  '+',0
+subnumname  du  '-',0
+mulnumname  du  '*',0
+divnumname  du  '/',0
 ;primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
 primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
             du  '#f (quote #f) #t (quote #t))',0
@@ -62,6 +65,9 @@ macro initPrimFunTable {
         addFun  condname, cond
         addFun  displayname, thedisplay
         addFun  addnumname, addNum
+        addFun  subnumname, subNum
+        addFun  mulnumname, mulNum
+        addFun  divnumname, divNum
 
         stdcall readExpression, primconst
         mov     ebx, eax
@@ -833,8 +839,8 @@ proc funcall uses esi ebx ecx, hFuncall, hArgs, envs
     .exit:
         ret
     .proc_lambda:
-        ;stdcall evalLambda, eax, [esi+NODE.next], [envs]
-        stdcall evalLambda, eax, esi, [envs]
+        ;stdcall evalLambda, ecx, [esi+NODE.next], [envs]
+        stdcall evalLambda, ecx, esi, [envs]
         jmp     .exit
     .no_binding_error:
         ;checkNode eax
@@ -1253,65 +1259,7 @@ proc thedisplay, noargs, thenode, envs
         ret
 endp
 
-proc addNum uses esi edi ebx ecx edx, hAdd, nums, envs
-        locals
-            tempInt     dd  0
-            tempFloat   dq  0.0
-            varx        du  'x',0
-        endl
-        cmp     [nums], 0
-        je      argnum_error
-        mov     esi, [nums]
-        mov     ebx, [hAdd]
-        cmp     [esi+NODE.next], ebx
-        je      .make_lambda
-        finit
-        fld     [tempFloat]
-    .start_loop:
-        stdcall eval, 0, esi, [envs]
-        cmp     [eax+NODE.type], INTEGER
-        jne     @f
-        mov     edx, [tempInt]
-        mov     ecx, [eax+NODE.value]
-        mov     ecx, [ecx+NUMBERSTRUCT.value]
-        mov     ecx, [ecx]
-        add     edx, ecx
-        mov     [tempInt], edx
-        jmp     .next_loop
-    @@:
-        cmp     [eax+NODE.type], FLOAT
-        jne     @f
-        mov     ecx, [eax+NODE.value]
-        mov     ecx, [ecx+NUMBERSTRUCT.value]
-        fld     qword [ecx]
-        faddp
-        fst     qword [tempFloat]
-        jmp     .next_loop
-    @@:
-        jmp     type_error
-    .next_loop:
-        cmp     [esi+NODE.next], ebx
-        je      @f
-        mov     esi, [esi+NODE.next]
-        jmp     .start_loop
-    @@:
-    .finish:
-        fldz
-        fcomip  st, st1
-        je      @f
-        fild    [tempInt]
-        faddp
-        fstp    qword [tempFloat]
-        lea     edi, [tempFloat]
-        stdcall allocateFloat, edi
-        stdcall allocateNode, eax, FLOAT
-        jmp     .exit
-    @@:
-        stdcall allocateInteger, [tempInt]
-        stdcall allocateNode, eax, INTEGER
-    .exit:
-        ret
-    .make_lambda:
+macro numMakeLambda {
         stdcall allocateSymbol, lambdaname
         stdcall allocateNode, eax, SYMBOL
         mov     ebx, eax
@@ -1319,13 +1267,104 @@ proc addNum uses esi edi ebx ecx edx, hAdd, nums, envs
         stdcall allocateSymbol, esi         ; make a arg lambda x
         stdcall allocateNode, eax, SYMBOL
         mov     ecx, eax
-        stdcall pushNode, [hAdd], eax       ; (cons exprs (cons x null))
+        stdcall pushNode, [head], eax       ; (cons exprs (cons x null))
         stdcall allocateSymbol, esi
         stdcall allocateNode, eax, SYMBOL
         stdcall allocateNode, eax, LIST     ; (x)
         stdcall pushNode, ebx, eax          ; (lambda (x))
-        stdcall allocateNode, [hAdd], LIST
+        stdcall allocateNode, [head], LIST
         stdcall pushNode, ebx, eax          ; (lambda (x) exprs)
         stdcall lambda, ebx, [ebx+NODE.next], [envs]
+}
+
+macro numToFinish floattype {
+    if floattype eq
+        cmp     [isthisfloat], TRUE
+        je      @f
+        fistp   [tempint]
+        stdcall allocateInteger, [tempint]
+        stdcall allocateNode, eax, INTEGER
         ret
+    @@:
+    else
+    end if
+        fstp    qword [tempval]
+        lea     edi, [tempval]
+        stdcall allocateFloat, edi
+        stdcall allocateNode, eax, FLOAT
+        ret
+}
+
+macro makeNum command, floattype {
+        locals
+            tempval dq  0.0
+            tempint dd  0
+            varx    du  'x',0
+            isthisfloat db  FALSE
+        endl
+        cmp     [nums], 0
+        je      argnum_error
+        mov     esi, [nums]
+        mov     ebx, [head]
+        cmp     [esi+NODE.next], ebx
+        je      .make_lambda
+        finit
+        stdcall eval, 0, esi, [envs]
+        cmp     [eax+NODE.type], INTEGER
+        jne     @f
+        mov     eax, [eax+NODE.value]
+        mov     eax, [eax+NUMBERSTRUCT.value]
+        fild    dword [eax]
+        jmp     .start_loop
+    @@:
+        cmp     [eax+NODE.type], FLOAT
+        jne     type_error
+        mov     eax, [eax+NODE.value]
+        mov     eax, [eax+NUMBERSTRUCT.value]
+    if floattype eq
+        mov     [isthisfloat], TRUE
+    end if
+        fld     qword [eax]
+    .start_loop:
+        mov     esi, [esi+NODE.next]
+        stdcall eval, 0, esi, [envs]
+        mov     ecx, [eax+NODE.type]
+        mov     eax, [eax+NODE.value]
+        mov     eax, [eax+NUMBERSTRUCT.value]
+        cmp     ecx, INTEGER
+        jne     @f
+        fild    dword [eax]
+        jmp     .next_loop
+    @@:
+        cmp     ecx, FLOAT
+        jne     type_error
+    if floattype eq
+        mov     [isthisfloat], TRUE
+    end if
+        fld     qword [eax]
+    .next_loop:
+        command st1, st
+        cmp     [esi+NODE.next], ebx
+        jne     .start_loop
+    .finish:
+        numToFinish floattype
+    .make_lambda:
+        numMakeLambda
+        ret
+}
+
+proc addNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum faddp
+endp
+
+proc subNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fsubp
+endp
+
+proc mulNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fmulp
+endp
+
+proc divNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fdivp, true
 endp
