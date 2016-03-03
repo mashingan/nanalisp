@@ -144,7 +144,7 @@ proc convertToInt uses esi ebx ecx edx, intstr, digits
         cmp     word [esi], '-'
         jne     .theloop
         mov     dl, TRUE
-        inc     esi
+        inc2    esi
         dec     ecx
     .theloop:
         cmp     word [esi], 0

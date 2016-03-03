@@ -559,3 +559,105 @@ macro checkIsValidInt thestr, looptime {
         checkFUNSTACKTRACE
         cleanFUNSTACKTRACE
         jmp     .finish
+
+;; Below are all test expressions which already correct in some ways
+;str1    du  '(progn (setq hello (lambda (x y) (cons x (cons y null))))'
+        ;du  ' (hello 1 2))',0
+;str1    du  '((progn (setq hello (lambda (x y) (cons x (cons y null))))'
+        ;du  ' (hello (quote hello-world))) (quote nice-going))',0
+;str1    du  '((progn (setq hello (lambda (x y) (cons x (cons y null))))'
+        ;du  ' (hello 1)) 2)',0
+;str1    du  '(progn (setq hello (lambda (x y) (cons x (cons y null))))'
+        ;du  ' (hello 1))',0
+;str1    du  '(((progn (setq hello (lambda (x y) (cons x (cons y null))))'
+        ;du  ' (hello 1))) 2)',0
+;str1    du  '(((progn (setq hello (lambda (x y) (cons x (cons y null))))'
+        ;du  ' (hello 1))) 2 3 4 5)',0
+;str1    du  '(progn (setq hello (lambda () (quote world))) (hello))',0
+;str1    du  '(cons 1 (cons 2 null))',0
+;str1    du  '(cdr (quote (1 2 3 4 5)))',0
+;str1    du  '(progn (set! hello (quote (1 2 3 4)))'
+        ;du  '  (cons (car hello) (cdr hello)))',0
+;str1    du  '(cond (5 true) (true false))',0
+;str1    du  '(cond ((atom? (quote (1 2 3))) false) (true (quote (1 2))))',0
+;str1    du  '((lambda (x) (cons (cdr x) (car x))) (quote (1 2 3 4)))',0
+;str1    du  '(lambda (x) (cons (cdr x) (car x)))',0
+;str1    du  '(begin (setf greeting #f)'
+        ;du  ' (cond (greeting (quote (hello world)))'
+        ;du         '(true (quote (nice going)))))',0
+;str1    du  '(cdr (quote (1)))',0
+;str1    du  '(car null)',0
+;str1    du  '(display 5.5)',0
+;str1    du  '(eq? 1.25 1.25)',0
+;str1    du  '(equal? 2.235 2.235)',0
+;str1    du '(progn (setq hello (quote (1 2.235 3)))'
+        ;du ' (equal? hello (quote (1 2.235 3))))',0
+;str1    du  '(+ 1 2 3)',0
+;str1    du  '(+ 1)',0
+;str1    du  '((+ 1) 2)',0
+;str1    du  '(length (quote (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)))',0
+;str1    du  '(+ 1.5 1.5 3)',0
+;str1    du  '((+ 1) 2.5)',0
+;str1 du '0',0
+;str1    du  '(null? (quote ()))',0
+;str1 du '(cdr (quote ()))',0
+;str1 du '(cons (quote ()) (quote hello-world))',0
+;str1 du '(car null)',0
+;str1 du '(cdr null)',0
+;str1 du '(cdr ())',0
+;str1 du '(cdr (quote ((quote ()))))',0
+;str1 du '(begin (setq x (quote ((quote ())))) (cdr x))',0
+;str1 du '(null? (cdr (quote ((quote ())))))',0
+;str1 du '(null? (quote (( ()))))',0
+;str1    du  '(progn (setq hello (lambda (x)'
+        ;du  '(cond ((null? x) null)'
+        ;du  '(true (cons (car x) (hello (cdr x)))))))'
+        ;du  '(hello (quote (1 nice 2 world (quote ()) ))))',0
+;str1 du '(cdr ((quote ())))',0
+;str1    du  '(progn (setq hello (lambda (x)'
+        ;du  '(cond ((null? x) null)'
+        ;du  '(true (cons (car x) (hello (cdr x)))))))'
+        ;du  '(hello (quote (1 nice 2 world () ))))',0
+;str1    du  '(progn (setq hello (lambda (x)'
+        ;du  '(cond ((null? x) null)'
+        ;du  '(true (cons (cons (car x) (quote ())) (hello (cdr x)))))))'
+        ;du  '(hello (quote (1 2))))',0
+;str1 du '(begin (setq 1+ (lambda (x) (+ x 1))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (1+ (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1 du '(begin (setq x-1 (lambda (x) (- x 1))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (x-1 (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1    du  '(- 3 2 1)',0
+;str1    du  '(- 3)',0
+;str1    du  '((- 1) 2)',0
+;str1    du  '(* 3 2 1)',0
+;str1    du  '(* 3.5 2.5 1)',0
+;str1    du  '(* 3)',0
+;str1    du  '((* 1) 2)',0
+;str1 du '(begin (setq *2.5 (lambda (x) (* x 2.5))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (*2.5 (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1 du '(/ 10 2 2)',0
+;str1 du '(/ 10)',0
+;str1 du '((/ 10) 2)',0
+;str1 du '(begin (setq /2.5 (lambda (x) (/ x 2.5))'
+     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (/2.5 (car x)) (hello (cdr x)))))))'
+     ;du ' (hello (quote (1 2 3 4))))',0
+;str1 du '(cos (/ (* 180 7) 22))',0
+;str1 du '(cos (/ 180 3.1415926535897932384626433832795))',0
+;str1 du '(cos 0)',0
+;str1 du '(cos 90)',0
+;str1 du '(sin 0)',0
+;str1 du '(abs -10.e-5)',0
+;str1 du '(abs -10)',0
+;str1 du '-5',0
+;str1 du '(sqrt 81)',0
+;str1 du '(sqrt 16 81)',0
+;str1 du '(tan 0)',0
+;str1 du '(tan 10)',0
+;str1 du '(cotan 10)',0

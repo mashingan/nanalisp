@@ -27,6 +27,12 @@ addnumname  du  '+',0
 subnumname  du  '-',0
 mulnumname  du  '*',0
 divnumname  du  '/',0
+sinnumname  du  'sin',0
+cosnumname  du  'cos',0
+tannumname  du  'tan',0
+cotannumname du  'cotan',0
+absnumname  du  'abs',0
+sqrtname    du  'sqrt',0
 ;primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
 primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
             du  '#f (quote #f) #t (quote #t))',0
@@ -68,6 +74,12 @@ macro initPrimFunTable {
         addFun  subnumname, subNum
         addFun  mulnumname, mulNum
         addFun  divnumname, divNum
+        addFun  sinnumname, sinNum
+        addFun  cosnumname, cosNum
+        addFun  tannumname, tanNum
+        addFun  cotannumname, cotanNum
+        addFun  absnumname, absNum
+        addFun  sqrtname, sqrt
 
         stdcall readExpression, primconst
         mov     ebx, eax
@@ -1295,7 +1307,7 @@ macro numToFinish floattype {
         ret
 }
 
-macro makeNum command, floattype {
+macro makeNum command, floattype, onlyonearg, fortan {
         locals
             tempval dq  0.0
             tempint dd  0
@@ -1306,8 +1318,13 @@ macro makeNum command, floattype {
         je      argnum_error
         mov     esi, [nums]
         mov     ebx, [head]
+    if onlyonearg eq
         cmp     [esi+NODE.next], ebx
         je      .make_lambda
+    else
+        cmp     [esi+NODE.next], ebx
+        jne     argnum_error
+    end if
         finit
         stdcall eval, 0, esi, [envs]
         cmp     [eax+NODE.type], INTEGER
@@ -1315,6 +1332,10 @@ macro makeNum command, floattype {
         mov     eax, [eax+NODE.value]
         mov     eax, [eax+NUMBERSTRUCT.value]
         fild    dword [eax]
+    if onlyonearg eq
+    else
+        jmp     .next_loop
+    end if
         jmp     .start_loop
     @@:
         cmp     [eax+NODE.type], FLOAT
@@ -1325,6 +1346,10 @@ macro makeNum command, floattype {
         mov     [isthisfloat], TRUE
     end if
         fld     qword [eax]
+    if onlyonearg eq
+    else
+        jmp     .next_loop
+    end if
     .start_loop:
         mov     esi, [esi+NODE.next]
         stdcall eval, 0, esi, [envs]
@@ -1343,10 +1368,20 @@ macro makeNum command, floattype {
     end if
         fld     qword [eax]
     .next_loop:
+    if onlyonearg eq
         command st1, st
+    else
+        command
+    end if
         cmp     [esi+NODE.next], ebx
         jne     .start_loop
     .finish:
+    if fortan eq
+    else if fortan eq cotan
+        fdivrp
+    else
+        fstp    qword [tempval]
+    end if
         numToFinish floattype
     .make_lambda:
         numMakeLambda
@@ -1366,5 +1401,29 @@ proc mulNum uses esi edi ebx ecx edx, head, nums, envs
 endp
 
 proc divNum uses esi edi ebx ecx edx, head, nums, envs
-        makeNum fdivp, true
+        makeNum fdivp, yes
+endp
+
+proc cosNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fcos, yes, yes
+endp
+
+proc sinNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fsin, yes, yes
+endp
+
+proc tanNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fptan, yes, yes, yes
+endp
+
+proc cotanNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fptan, yes, yes, cotan
+endp
+
+proc absNum uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fabs, , yes
+endp
+
+proc sqrt uses esi edi ebx ecx edx, head, nums, envs
+        makeNum fsqrt, yes, yes
 endp

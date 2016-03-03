@@ -16,99 +16,22 @@ include 'variables.inc'
 ;str1    du '(progn (setq hello (lambda () (display "hello world")'
         ;du ' (hello)))'
         ;du ' (hello))',0
+;str1 du '(begin (setf factorial (lambda (x y) (cond ((equal? x 1) y)'
+     ;du '(true (factorial (- x 1) (* x y)))))) (factorial 20 1))',0
+;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
+     ;du '(true (* x (factorial (- x 1))))))) (factorial 5))',0
+;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
+     ;du '(true (* x (factorial (- x 1))))))) (factorial 10))',0
 
 
 ;; ERROR
 
 
 ;; OK
-;str1    du  '(progn (setq hello (lambda (x y) (cons x (cons y null))))'
-        ;du  ' (hello 1 2))',0
-;str1    du  '((progn (setq hello (lambda (x y) (cons x (cons y null))))'
-        ;du  ' (hello (quote hello-world))) (quote nice-going))',0
-;str1    du  '((progn (setq hello (lambda (x y) (cons x (cons y null))))'
-        ;du  ' (hello 1)) 2)',0
-;str1    du  '(progn (setq hello (lambda (x y) (cons x (cons y null))))'
-        ;du  ' (hello 1))',0
-;str1    du  '(((progn (setq hello (lambda (x y) (cons x (cons y null))))'
-        ;du  ' (hello 1))) 2)',0
-;str1    du  '(((progn (setq hello (lambda (x y) (cons x (cons y null))))'
-        ;du  ' (hello 1))) 2 3 4 5)',0
-;str1    du  '(progn (setq hello (lambda () (quote world))) (hello))',0
-;str1    du  '(cons 1 (cons 2 null))',0
-;str1    du  '(cdr (quote (1 2 3 4 5)))',0
-;str1    du  '(progn (set! hello (quote (1 2 3 4)))'
-        ;du  '  (cons (car hello) (cdr hello)))',0
-;str1    du  '(cond (5 true) (true false))',0
-;str1    du  '(cond ((atom? (quote (1 2 3))) false) (true (quote (1 2))))',0
-;str1    du  '((lambda (x) (cons (cdr x) (car x))) (quote (1 2 3 4)))',0
-;str1    du  '(lambda (x) (cons (cdr x) (car x)))',0
-;str1    du  '(begin (setf greeting #f)'
-        ;du  ' (cond (greeting (quote (hello world)))'
-        ;du         '(true (quote (nice going)))))',0
-;str1    du  '(cdr (quote (1)))',0
-;str1    du  '(car null)',0
-;str1    du  '(display 5.5)',0
-;str1    du  '(eq? 1.25 1.25)',0
-;str1    du  '(equal? 2.235 2.235)',0
-;str1    du '(progn (setq hello (quote (1 2.235 3)))'
-        ;du ' (equal? hello (quote (1 2.235 3))))',0
-;str1    du  '(+ 1 2 3)',0
-;str1    du  '(+ 1)',0
-;str1    du  '((+ 1) 2)',0
-;str1    du  '(length (quote (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)))',0
-;str1    du  '(+ 1.5 1.5 3)',0
-;str1    du  '((+ 1) 2.5)',0
-;str1 du '0',0
-;str1    du  '(null? (quote ()))',0
-;str1 du '(cdr (quote ()))',0
-;str1 du '(cons (quote ()) (quote hello-world))',0
-;str1 du '(car null)',0
-;str1 du '(cdr null)',0
-;str1 du '(cdr ())',0
-;str1 du '(cdr (quote ((quote ()))))',0
-;str1 du '(begin (setq x (quote ((quote ())))) (cdr x))',0
-;str1 du '(null? (cdr (quote ((quote ())))))',0
-;str1 du '(null? (quote (( ()))))',0
-;str1    du  '(progn (setq hello (lambda (x)'
-        ;du  '(cond ((null? x) null)'
-        ;du  '(true (cons (car x) (hello (cdr x)))))))'
-        ;du  '(hello (quote (1 nice 2 world (quote ()) ))))',0
-;str1 du '(cdr ((quote ())))',0
-;str1    du  '(progn (setq hello (lambda (x)'
-        ;du  '(cond ((null? x) null)'
-        ;du  '(true (cons (car x) (hello (cdr x)))))))'
-        ;du  '(hello (quote (1 nice 2 world () ))))',0
-;str1    du  '(progn (setq hello (lambda (x)'
-        ;du  '(cond ((null? x) null)'
-        ;du  '(true (cons (cons (car x) (quote ())) (hello (cdr x)))))))'
-        ;du  '(hello (quote (1 2))))',0
-;str1 du '(begin (setq 1+ (lambda (x) (+ x 1))'
-     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
-     ;du ' (true (cons (1+ (car x)) (hello (cdr x)))))))'
-     ;du ' (hello (quote (1 2 3 4))))',0
-;str1 du '(begin (setq x-1 (lambda (x) (- x 1))'
-     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
-     ;du ' (true (cons (x-1 (car x)) (hello (cdr x)))))))'
-     ;du ' (hello (quote (1 2 3 4))))',0
-;str1    du  '(- 3 2 1)',0
-;str1    du  '(- 3)',0
-;str1    du  '((- 1) 2)',0
-;str1    du  '(* 3 2 1)',0
-;str1    du  '(* 3.5 2.5 1)',0
-;str1    du  '(* 3)',0
-;str1    du  '((* 1) 2)',0
-;str1 du '(begin (setq *2.5 (lambda (x) (* x 2.5))'
-     ;du ' hello (lambda (x) (cond ((null? x) (quote ()))'
-     ;du ' (true (cons (*2.5 (car x)) (hello (cdr x)))))))'
-     ;du ' (hello (quote (1 2 3 4))))',0
-;str1 du '(/ 10 2 2)',0
-;str1 du '(/ 10)',0
-;str1 du '((/ 10) 2)',0
-str1 du '(begin (setq /2.5 (lambda (x) (/ x 2.5))'
-     du ' hello (lambda (x) (cond ((null? x) (quote ()))'
-     du ' (true (cons (/2.5 (car x)) (hello (cdr x)))))))'
-     du ' (hello (quote (1 2 3 4))))',0
+str1 du '(begin (setf factorial (lambda (x y) (cond ((equal? x 1) y)'
+     du '(true (factorial (- x 1) (* x y)))))) (factorial 5 1))',0
+;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
+     ;du '(true (* (factorial (- x 1)) x))))) (factorial 5))',0
 lenstr1 = $ - str1
 ;str1    du  '1.45e10',0
 ;str2    du  '1.45',0
