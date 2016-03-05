@@ -661,3 +661,46 @@ macro checkIsValidInt thestr, looptime {
 ;str1 du '(tan 0)',0
 ;str1 du '(tan 10)',0
 ;str1 du '(cotan 10)',0
+
+
+;===================================================
+;; This part is for interpreting continually
+
+    .startloop:    ; total 42 lines
+        mov     edi, [hBuffin]
+        clearBuffer edi, MAXBUFFER
+        writeIt [outhnd], prompt
+        mov     edx, 0
+    @@:
+        mov     esi, [hBuffin]
+        lea     esi, [esi+edx]
+        invoke  ReadConsoleW, [inhnd], esi, MAXBUFFER, numwrtn, 0
+        stdcall checkInput, esi
+        invoke  lstrlenW, edi
+        lea     eax, [eax*2]
+        mov     edx, eax
+        cmp     [numwrtn], 2
+        je      @b
+        cmp     byte [aphostrophs], TRUE
+        je      @b
+        cmp     [parenthesis], 0
+        jl      .invalid_expression
+        jne     @b
+        stdcall normalizeInput, edi
+        invoke  lstrlenW, edi
+        lea     eax, [eax*2]
+        mov     word [edi+eax-4], 0
+        ;cinvoke wsprintf, bufout, fmt, buffin
+        ;writeLn [outhnd], bufout
+
+        stdcall readExpression, edi
+        mov     ebx, eax
+        stdcall eval, 0, eax, 0
+        mov     ecx, eax
+        stdcall printNode, [outhnd], eax
+        newline [outhnd]
+        stdcall removeNode, ebx
+        stdcall removeNode, ecx
+        ;checkFUNSTACKTRACE
+        ;cleanFUNSTACKTRACE
+        jmp     .startloop

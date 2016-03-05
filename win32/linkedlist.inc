@@ -16,7 +16,7 @@ ends
 struct SYMBOLSTRUCT
     hMemory dd  ?   ; Handles memory location of symbol
     hVars   dd  ?   ; Handles memory location for variables closures
-    hString du  ?   ; Handles memory location of STRINGSTRUCT
+    hString dd  ?   ; Handles memory location of STRINGSTRUCT
 ends
 
 struct VARIABLESTRUCT
@@ -544,8 +544,8 @@ proc removeNode uses esi eax ecx edx, thenode
             LAMBDA,   Lambda,\
             FUNCTION, Function
     .finish:
-        mov     ecx, [esi+NODE.hMemory]
-        memfree ecx
+        ;mov     ecx, [esi+NODE.hMemory]
+        ;memfree ecx
     .exit:
         ret
 endp

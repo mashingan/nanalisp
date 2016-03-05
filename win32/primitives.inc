@@ -725,6 +725,8 @@ proc eval uses esi edi ebx ecx edx, hEval, atoms, envs
         stdcall isNull, ebx
         cmp     eax, TRUE
         je      .return_atom
+        cmp     [ebx+NODE.type], LAMBDA
+        je      .return_itself
         mov     esi, [ebx+NODE.value]
         cmp     [esi+NODE.type], LIST
         jne     @f
@@ -743,6 +745,7 @@ proc eval uses esi edi ebx ecx edx, hEval, atoms, envs
         jmp     .exit
     @@:
         stdcall lookup, [envs], [esi+NODE.value]
+        ;stdcall lookup, [envs], esi
         cmp     eax, NULL
         je      @f
         jmp     .proc_func
@@ -790,6 +793,12 @@ proc eval uses esi edi ebx ecx edx, hEval, atoms, envs
         pushToFUNSTACKTRACE eax
         pop     eax
         mov     eax, [eax+VARIABLESTRUCT.hValue]
+        cmp     [eax+NODE.type], LAMBDA
+        jne     @f
+        stdcall cpyNode, eax    ; copying lambda
+        stdcall evalLambda, eax, esi, [envs]
+        jmp     .exit
+        @@:
         mov     eax, [eax+NODE.value]
         stdcall eax, esi, [esi+NODE.next], [envs]
         jmp     .exit
@@ -822,8 +831,12 @@ proc funcall uses esi ebx ecx, hFuncall, hArgs, envs
         mov     ebx, [hFuncall]
         mov     esi, [hArgs]
         mov     eax, esi
+        mov     ecx, esi
         cmp     [esi+NODE.type], SYMBOL
         je      @f
+        ;cmp     [esi+NODE.type], LAMBDA
+        ;je      .proc_lambda
+    @@:
         push    esi
         stdcall eval, 0, esi, [envs] ; 2nd arg after funcall
         mov     ecx, eax
@@ -861,7 +874,7 @@ endp
 
 proc quit uses esi ebx, hQuit, hArgs, envs
         xor     eax, eax
-        jmp     exit
+        jmp     finish
         ret
 endp
 
@@ -1041,6 +1054,8 @@ proc evalLambda uses esi edi ebx ecx edx, hEval, atoms, envs
         mov     edi, ecx
         stdcall isCurry, ecx
         mov     [unboundNum], eax
+        cmp     eax, 0
+        je      .endbindings
     .startbindings:
         cmp     ebx, 0
         je      .endbindings
