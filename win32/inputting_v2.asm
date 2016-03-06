@@ -16,10 +16,6 @@ include 'variables.inc'
 ;str1    du '(progn (setq hello (lambda () (display "hello world")'
         ;du ' (hello)))'
         ;du ' (hello))',0
-;str1 du '(begin (setf factorial (lambda (x y) (cond ((equal? x 1) y)'
-     ;du '(true (factorial (- x 1) (* x y)))))) (factorial 20 1))',0
-;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
-     ;du '(true (* x (factorial (- x 1))))))) (factorial 5))',0
 ;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
      ;du '(true (* x (factorial (- x 1))))))) (factorial 10))',0
 
@@ -32,9 +28,14 @@ include 'variables.inc'
      ;du '(true (factorial (- x 1) (* x y)))))) (factorial 5 1))',0
 ;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
      ;du '(true (* (factorial (- x 1)) x))))) (factorial 5))',0
-str1 du '(progn (setq 1+ (lambda (x) (+ x 1)) map (lambda (f x) (cond'
-     du '((null? x) (quote ())) (true (cons (f (car x)) (map f'
-     du ' (cdr x))))))) (map 1+ (quote (1 2 3))))',0
+;str1 du '(progn (setq 1+ (lambda (x) (+ x 1)) map (lambda (f x) (cond'
+     ;du '((null? x) (quote ())) (true (cons (f (car x)) (map f'
+     ;du ' (cdr x))))))) (map 1+ (quote (1 2 3))))',0
+str1 du '(begin (setf factorial (lambda (x y) (cond ((equal? x 1) y)'
+     du '(true (factorial (- x 1) (* x y)))))) (factorial 20 1))',0
+;; return overflow
+;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
+     ;du '(true (* (factorial (- x 1)) x))))) (factorial 40))',0
 lenstr1 = $ - str1
 ;str1    du  '1.45e10',0
 ;str2    du  '1.45',0
@@ -85,7 +86,9 @@ start:
             argnum_error, argnumerror, ARGNUM_ERROR,\
             type_error, typeerror, TYPE_ERROR,\
             stack_error, stackerror, STACK_OVERFLOW_ERROR,\
-            unimplemented_error, unimplerror, UNIMPLEMENTED_ERROR
+            zero_division_error, zerodiverror, ZERO_DIVISION_ERROR,\
+            unimplemented_error, unimplerror, UNIMPLEMENTED_ERROR,\
+            overflow_error, overflowerror, OVERFLOW_ERROR
 
 
 proc initVarTable uses esi eax ebx ecx

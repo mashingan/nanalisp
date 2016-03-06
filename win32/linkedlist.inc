@@ -150,6 +150,7 @@ proc makelist uses esi edi ebx ecx, thestring
             CHAR, Char, ,\
             STRING, String, ,\
             INTEGER, Number, INTEGER,\
+            LONG, Number, LONG,\
             FLOAT, Number, FLOAT
         cmp     eax, LIST
         jne     .nextloop
@@ -282,6 +283,15 @@ proc allocateNumber uses esi ebx ecx edx, strvalue, valtype
         mov     [ecx], eax
         jmp     .exit
     @@:
+        cmp     dword [valtype], LONG
+        jne     @f
+        memalloc 8
+        mov     dword [ebx+NUMBERSTRUCT.value], eax
+        stdcall convertToLong, esi, [len]
+        mov     edx, dword [ebx+NUMBERSTRUCT.value]
+        fistp   qword [edx]
+        jmp     .exit
+    @@:
         cmp     dword [valtype], FLOAT
         jne     @f
         memalloc 8
@@ -303,7 +313,7 @@ macro allocNumber thetype {
         mov     [ebx+NUMBERSTRUCT.hNumber], eax
     if thetype eq INTEGER
         mov     ecx, 4
-    else if thetype eq FLOAT
+    else if thetype in <LONG, FLOAT>
         mov     ecx, 8
     end if
         mov     [ebx+NUMBERSTRUCT.type], thetype
@@ -326,6 +336,16 @@ proc allocateInteger uses esi edi ebx, thevalue
         mov     esi, [thevalue]
         mov     edi, eax
         mov     [edi], esi
+        mov     eax, ebx
+        ret
+endp
+
+proc allocateLong uses esi edi ebx, thevalue
+        allocNumber LONG
+        mov     esi, [thevalue]
+        mov     edi, eax
+        movsd
+        movsd
         mov     eax, ebx
         ret
 endp
@@ -440,6 +460,7 @@ proc printNode uses esi edi eax ebx ecx, theout, thenode
             LIST,       List,\
             PAIR,       Pair,\
             INTEGER, Integer,\
+            LONG,       Long,\
             FLOAT,     Float,\
             LAMBDA,   Lambda,\
             FUNCTION, Function
@@ -494,6 +515,13 @@ proc printFloat uses eax ecx edx, theout, thenum
         ret
 endp
 
+proc printLong uses eax ecx edx, theout, thenum
+        mov     eax, [thenum]
+        mov     eax, [eax+NUMBERSTRUCT.value]
+        cinvoke wprintf, fmtlng, dword [eax], dword [eax+4]
+        ret
+endp
+
 macro funcprint lambdanode {
         mov     esi, [lambdanode]
         mov     esi, [lambdanode+LAMBDASTRUCT.hExpr]
@@ -540,6 +568,7 @@ proc removeNode uses esi eax ecx edx, thenode
             LIST,       List,\
             PAIR,       List,\
             INTEGER,  Number,\
+            LONG,     Number,\
             FLOAT,    Number,\
             LAMBDA,   Lambda,\
             FUNCTION, Function
@@ -752,7 +781,17 @@ proc cpyNumber uses esi edi ebx ecx edx, numstruct
         mov     edi, eax
         mov     esi, [esi+NUMBERSTRUCT.value]
         movsd
-        jmp     .to_exit
+        jmp     .exit
+    @@:
+        cmp     edx, LONG
+        jne     @f
+        memalloc 8
+        mov     [edi+NUMBERSTRUCT.value], eax
+        mov     edi, eax
+        mov     esi, [esi+NUMBERSTRUCT.value]
+        movsd
+        movsd
+        jmp     .exit
     @@:
         memalloc 8
         mov     [edi+NUMBERSTRUCT.value], eax
@@ -760,10 +799,8 @@ proc cpyNumber uses esi edi ebx ecx edx, numstruct
         mov     esi, [esi+NUMBERSTRUCT.value]
         movsd
         movsd
-    .to_exit:
-        mov     eax, ebx
-        jmp     .exit
     .exit:
+        mov     eax, ebx
         ret
 endp
 
@@ -823,6 +860,7 @@ proc cpyNode uses esi edi ebx ecx, nodestruct
             STRING, String,\
             LIST, List,\
             INTEGER, Number,\
+            LONG, Number,\
             FLOAT, Number,\
             LAMBDA, Lambda
         mov     eax, [nodestruct]

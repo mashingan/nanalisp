@@ -166,6 +166,12 @@ proc identify uses esi ebx ecx, thestr
         isInteger esi
         cmp     eax, 0
         jne     @f
+        invoke  lstrlenW, [thestr]
+        cmp     eax, INT32_LEN
+        jle     .is_integer
+        mov     eax, LONG
+        jmp     .exit
+      .is_integer:
         mov     eax, INTEGER
         jmp     .exit
     @@:

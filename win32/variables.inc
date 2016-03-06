@@ -1,23 +1,40 @@
 inhnd   dd  ?
 outhnd  dd  ?
+procHeap dd 0
 numwrtn dd  0
 parenthesis dd  0
 hBuffin dd  0
 hDummy  dd  0
 aphostrophs db  FALSE
 fmtflt  du  '%g',0
+fmtlng  du  '%lld',0
 prompt  du  '? ',0
 
 ;hTbyte  dt  0.0
 
+INT32_MAX = +2147483647
+INT32_MIN = -2147483648
+INT32_LEN = 10
+INT64_MAX = +9223372036854775807
+INT64_MIN = -9223372036854775808
+INT64_LEN = 18
 
-NO_ERROR                 = 0x00
-TYPE_ERROR               = 0x01
-ARGNUM_ERROR             = 0x02
-NO_BINDING_ERROR         = 0x03
-INVALID_EXPRESSION_ERROR = 0x04
-STACK_OVERFLOW_ERROR     = 0x05
-UNIMPLEMENTED_ERROR      = 0x06
+int32_max   dd  INT32_MAX
+int32_min   dd  INT32_MIN
+int64_max   dq  INT64_MAX
+int64_min   dq  INT64_MIN
+
+
+macro enumsymbols [enums] {
+    common x = 0
+    forward
+        enums = x
+        x = x + 1
+}
+
+enumsymbols NO_ERROR, TYPE_ERROR, ARGNUM_ERROR, NO_BINDING_ERROR,\
+            INVALID_EXPRESSION_ERROR, STACK_OVERFLOW_ERROR,\
+            UNIMPLEMENTED_ERROR, ZERO_DIVISION_ERROR, OVERFLOW_ERROR
 
 typeerror       du 'TYPE ERROR',0
 argnumerror     du 'ARGNUM ERROR',0
@@ -25,23 +42,16 @@ nobindingerror  du 'NO BINDING ERROR',0
 invldexprerror  du 'INVALID EXPRESSION ERROR',0
 stackerror      du 'STACK OVERFLOW ERROR',0
 unimplerror     du 'UNIMPLEMENTED ERROR',0
+zerodiverror    du 'ZERO DIVISION ERROR',0
+overflowerror   du 'OVERFLOW ERROR',0
 
 VARTABLESIZE = 32
 VARTABLE    dd  VARTABLESIZE dup (0)
 PRIMFUNTABLE    VARIABLESTRUCT <0>
 FUNSTACKTRACE   dd 0
 
-UNDEF   = 0x00
-SYMBOL  = 0x01
-CHAR    = 0x02
-STRING  = 0x03
-INTEGER = 0x04
-FLOAT   = 0x05
-PAIR    = 0x06
-LIST    = 0x07
-EXPRS   = 0x08
-LAMBDA  = 0x09
-FUNCTION= 0x0A
+enumsymbols UNDEF, SYMBOL, CHAR, STRING, INTEGER, LONG,\
+            FLOAT, PAIR, LIST, EXPRS, LAMBDA, FUNCTION
 
 ;undef   du  'UNDEFINED',0
 ;symb    du  'SYMBOL',0
@@ -61,4 +71,3 @@ FUNCTION= 0x0A
 
 
 ;list    NODE    <0>
-procHeap dd     0

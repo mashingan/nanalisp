@@ -568,6 +568,14 @@ proc equalNumber uses esi edi ebx ecx edx, numstruct1, numstruct2
         je      .is_true
         jmp     .exit
     @@:
+        cmp     edx, LONG
+        jne     @f
+        fild    qword [ebx]
+        fild    qword [ecx]
+        fcomip  st, st1
+        je      .is_true
+        jmp     .exit
+    @@:
         finit
         fld     qword [ebx]
         fld     qword [ecx]
@@ -638,6 +646,7 @@ proc equalNode uses esi edi ebx ecx, node1, node2
             CHAR,      Char,\
             STRING,  String,\
             INTEGER, Number,\
+            LONG,    Number,\
             FLOAT,   Number,\
             LIST,      List
     .is_false:
@@ -1308,9 +1317,35 @@ macro numToFinish floattype {
     if floattype eq
         cmp     [isthisfloat], TRUE
         je      @f
+        push    eax
+        ficom   [int32_max]
+        fstsw   ax
+        sahf
+        jnc     .to_long
+        ficom   [int32_min]
+        fstsw   ax
+        sahf
+        jc      .to_long
+        pop     eax
         fistp   [tempint]
         stdcall allocateInteger, [tempint]
         stdcall allocateNode, eax, INTEGER
+        ret
+        .to_long:
+        fild    qword [int64_max]
+        fcomip  st, st1
+        jc      overflow_error
+        fild    qword [int64_min]
+        fcomip  st,st1
+        jnz     .not_same
+        jmp     overflow_error
+        .not_same:
+        jnc     overflow_error
+        pop     eax
+        fistp   qword [templng]
+        lea     edi, [templng]
+        stdcall allocateLong, edi
+        stdcall allocateNode, eax, LONG
         ret
     @@:
     else
@@ -1326,6 +1361,7 @@ macro makeNum command, floattype, onlyonearg, fortan {
         locals
             tempval dq  0.0
             tempint dd  0
+            templng dq  0
             varx    du  'x',0
             isthisfloat db  FALSE
         endl
@@ -1347,6 +1383,17 @@ macro makeNum command, floattype, onlyonearg, fortan {
         mov     eax, [eax+NODE.value]
         mov     eax, [eax+NUMBERSTRUCT.value]
         fild    dword [eax]
+    if onlyonearg eq
+    else
+        jmp     .next_loop
+    end if
+        jmp     .start_loop
+    @@:
+        cmp     [eax+NODE.type], LONG
+        jne     @f
+        mov     eax, [eax+NODE.value]
+        mov     eax, [eax+NUMBERSTRUCT.value]
+        fild    qword [eax]
     if onlyonearg eq
     else
         jmp     .next_loop
@@ -1376,6 +1423,11 @@ macro makeNum command, floattype, onlyonearg, fortan {
         fild    dword [eax]
         jmp     .next_loop
     @@:
+        cmp     ecx, LONG
+        jne     @f
+        fild    qword [eax]
+        jmp     .next_loop
+    @@:
         cmp     ecx, FLOAT
         jne     type_error
     if floattype eq
@@ -1383,6 +1435,11 @@ macro makeNum command, floattype, onlyonearg, fortan {
     end if
         fld     qword [eax]
     .next_loop:
+    if command eq fdivp
+        fldz
+        fcomip  st, st1
+        je      zero_division_error
+    end if
     if onlyonearg eq
         command st1, st
     else

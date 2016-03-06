@@ -1,4 +1,5 @@
 hDbl    dq  0.0
+hLong   dq  0
 
 macro isInteger thestr {
         local   .startloop, .finish, .notvalid, .exit, .actual_loop
@@ -291,6 +292,12 @@ proc convertToDouble uses esi edi ebx ecx edx, dblstr, digits
       .fin:
         pop     ecx
         jmp     .exit
+endp
+
+proc convertToLong uses esi edi ebx ecx edx, dblstr, digits
+        stdcall convertToDouble, [dblstr], [digits]
+        fistp   qword [hLong]
+        ret
 endp
 
 proc convertFromInteger uses edi eax ebx edx, thenum, outstr
