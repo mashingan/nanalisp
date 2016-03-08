@@ -104,10 +104,32 @@ macro inc2w [theval] {
         inc2    theval
 }
 
+macro FAILCHK {
+    local .next
+        push    eax
+        cmp     eax, NULL
+        jne     .next
+        invoke  GetLastError
+        cmp     eax, 0
+        je      .next
+        jmp     exit
+    .next:
+        pop     eax
+}
+
+macro memalloc allocsize {
+        invoke  HeapAlloc, [procHeap], HEAPFLAG, allocsize
+        FAILCHK
+}
+
+macro memfree memlocation {
+        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, memlocation
+        FAILCHK
+}
+
 macro initFUNSTACKTRACE {
         push    eax ecx edx
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NODE
-        FAILCHK
+        memalloc sizeof.NODE
         mov     [FUNSTACKTRACE], eax
         pop     edx ecx eax
 }
@@ -134,11 +156,9 @@ macro initProgram {
         mov     [inhnd], eax
         invoke  GetProcessHeap
         mov     [procHeap], eax
-        invoke  HeapAlloc, eax, HEAPFLAG, MAXBUFFER shl 1
-        FAILCHK
+        memalloc MAXBUFFER shl 1
         mov     [hBuffin], eax
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, MAXBUFFER shl 1
-        FAILCHK
+        memalloc MAXBUFFER shl 1
         mov     [hDummy], eax
         initFUNSTACKTRACE
         stdcall initVarTable
@@ -149,10 +169,8 @@ macro initProgram {
 
 macro cleanupProgram {
         cleanFUNSTACKTRACE
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, [hBuffin]
-        FAILCHK
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, [hDummy]
-        FAILCHK
+        memalloc [hBuffin]
+        memalloc [hDummy]
         ;invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, [FUNSTACKTRACE]
         ;FAILCHK
 }

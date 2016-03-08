@@ -31,11 +31,21 @@ include 'variables.inc'
 ;str1 du '(progn (setq 1+ (lambda (x) (+ x 1)) map (lambda (f x) (cond'
      ;du '((null? x) (quote ())) (true (cons (f (car x)) (map f'
      ;du ' (cdr x))))))) (map 1+ (quote (1 2 3))))',0
-str1 du '(begin (setf factorial (lambda (x y) (cond ((equal? x 1) y)'
-     du '(true (factorial (- x 1) (* x y)))))) (factorial 20 1))',0
+;str1 du '(begin (setf factorial (lambda (x y) (cond ((equal? x 1) y)'
+     ;du '(true (factorial (- x 1) (* x y)))))) (factorial 20 1))',0
+;str1 du '(/ 5 10 0 13)',0
 ;; return overflow
 ;str1 du '(begin (setf factorial (lambda (x) (cond ((equal? x 1) 1)'
      ;du '(true (* (factorial (- x 1)) x))))) (factorial 40))',0
+;str1 du '(< 5 5.5 6 6.1 7)',0
+;str1 du '(< 5 5 6 6 7)',0
+;str1 du '(<= 5 5 6 6 7 )',0
+;str1 du '(< 5)',0   ; return argnum error
+;str1 du '(string<? "helli" "hello")',0
+;str1 du '(string<=? "helli" "hello")',0
+;str1 du '(string>? "helli" "hello")',0
+;str1 du '(string>=? "helli" "hello")',0
+str1 du '(string>=? "hello" "hello")',0
 lenstr1 = $ - str1
 ;str1    du  '1.45e10',0
 ;str2    du  '1.45',0

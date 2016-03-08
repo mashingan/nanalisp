@@ -33,7 +33,18 @@ tannumname  du  'tan',0
 cotannumname du  'cotan',0
 absnumname  du  'abs',0
 sqrtname    du  'sqrt',0
-;primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
+lessnumname du  '<',0
+leqnumname  du  '<=',0
+morenumname du  '>',0
+meqnumname  du  '>=',0
+lessstrname du  'string<?',0
+leqstrname  du  'string<=?',0
+morestrname du  'string>?',0
+meqstrname  du  'string>=?',0
+lesschrname du  'char<?',0
+leqchrname  du  'char<=?',0
+morechrname du  'char>?',0
+meqchrname  du  'char>=?',0
 primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
             du  '#f (quote #f) #t (quote #t))',0
 
@@ -80,6 +91,18 @@ macro initPrimFunTable {
         addFun  cotannumname, cotanNum
         addFun  absnumname, absNum
         addFun  sqrtname, sqrt
+        addFun  lessnumname, lessNodeNumber
+        addFun  leqnumname, lessEqualNodeNumber
+        addFun  morenumname, moreNodeNumber
+        addFun  meqnumname, moreEqualNodeNumber
+        addFun  lessstrname, lessNodeString
+        addFun  leqstrname, lessEqualNodeString
+        addFun  morestrname, moreNodeString
+        addFun  meqstrname, moreEqualNodeString
+        addFun  lesschrname, lessNodeChar
+        addFun  leqchrname, lessEqualNodeChar
+        addFun  morechrname, moreNodeChar
+        addFun  meqchrname, moreEqualNodeChar
 
         stdcall readExpression, primconst
         mov     ebx, eax
@@ -1499,3 +1522,223 @@ endp
 proc sqrt uses esi edi ebx ecx edx, head, nums, envs
         makeNum fsqrt, yes, yes
 endp
+
+macro compareString struct1, struct2, cmptype {
+    local .return_false, .return_true, .start_loop, .end_loop, .exit
+        mov     esi, struct1
+        mov     edi, struct2
+        cmp     esi, edi
+        je      .return_false
+        mov     ecx, [esi+STRINGSTRUCT.size]
+        mov     edx, [edi+STRINGSTRUCT.size]
+        cmp     ecx, edx
+    if cmptype in <less, lessEqual>
+        jg      .return_false
+        jl      .return_true
+    else if cmptype in <more, moreEqual>
+        jl      .return_false
+        jg      .return_true
+    end if
+        add     esi, STRINGSTRUCT.text
+        add     edi, STRINGSTRUCT.text
+    .start_loop:
+        mov     ax, word [esi]
+        cmp     ax, word [edi]
+    if cmptype in <less, lessEqual>
+        jl      .return_true
+        jg      .return_false
+    else if cmptype in <more, moreEqual>
+        jg      .return_true
+        jl      .return_false
+    end if
+        inc2w   esi, edi
+        dec     ecx
+        jnz     .start_loop
+    .end_loop:
+    if cmptype in <lessEqual, moreEqual>
+        jmp     .return_true
+    end if
+    .return_false:
+        mov     eax, FALSE
+        jmp     .exit
+    .return_true:
+        mov     eax, TRUE
+    .exit:
+}
+
+macro procCmps cmptype, structtype {
+    proc cmptype#structtype uses esi edi ebx ecx edx, thestruct1,thestruct2
+        mov     esi, [thestruct1]
+        mov     edi, [thestruct2]
+    if structtype eq Char
+        mov     esi, [esi+CHARSTRUCT.hString]
+        mov     edi, [edi+CHARSTRUCT.hString]
+        compareString esi, edi, cmptype
+    else
+        compare#structtype esi, edi, cmptype
+    end if
+        ret
+    endp
+}
+
+procCmps less,      String
+procCmps lessEqual, String
+procCmps more,      String
+procCmps moreEqual, String
+
+procCmps less,      Char
+procCmps lessEqual, Char
+procCmps more,      Char
+procCmps moreEqual, Char
+
+macro toCheckNumber what, thesource, towhere, [thetype] {
+    common x = 0
+    forward x = x + 1
+    common b = 0
+    forward
+    local .stop1, .stop2
+        b = b + 1
+    .stop1:
+        cmp     what, thetype
+        jne     .stop2
+    if thetype eq INTEGER
+        fild    dword [thesource]
+    else if thetype eq LONG
+        fild    qword [thesource]
+    else
+        fld     qword [thesource]
+    end if
+    if b <> x
+        jmp     towhere
+    end if
+    .stop2:
+}
+
+macro compareNumber struct1, struct2, cmptype {
+    local .next_check, .comparison_check
+    local .return_false, .return_true
+    local .exit
+        mov     esi, struct1
+        mov     edi, struct2
+        mov     ecx, [esi+NUMBERSTRUCT.type]
+        mov     edx, [edi+NUMBERSTRUCT.type]
+        mov     eax, [esi+NUMBERSTRUCT.value]
+        toCheckNumber ecx, eax, .next_check, INTEGER, LONG, FLOAT
+    .next_check:
+        mov     eax, [edi+NUMBERSTRUCT.value]
+        toCheckNumber edx, eax, .comparison_check, INTEGER, LONG, FLOAT
+    .comparison_check:
+        fcomip  st, st1
+    if cmptype eq less
+        jc      .return_false
+        jnz     .return_true
+    else if cmptype eq lessEqual
+        jnc .return_true
+        jz  .return_true
+    else if cmptype eq more
+        jnc     .return_false
+        jmp     .return_true
+    else if cmptype eq moreEqual
+        jc  .return_true
+        jz  .return_true
+    end if
+    .return_false:
+        mov     eax, FALSE
+        jmp     .exit
+    .return_true:
+        mov     eax, TRUE
+    .exit:
+}
+
+procCmps less,      Number
+procCmps lessEqual, Number
+procCmps more,      Number
+procCmps moreEqual, Number
+
+macro toCheckIsNumber thenode, [thetype] {
+        cmp     [thenode+NODE.type], thetype
+        je      .return_false
+}
+
+proc isNumber uses esi edi ebx ecx edx, thenode
+        mov     eax, TRUE
+        stdcall isAtom, [thenode]
+        cmp     eax, TRUE
+        jne     .exit
+        mov     esi, [thenode]
+        toCheckIsNumber esi, SYMBOL, STRING, CHAR
+        jmp     .exit
+    .return_false:
+        mov     eax, FALSE
+    .exit:
+        ret
+endp
+
+macro toCheckCmpNode thedest, thesrc, structtype {
+        stdcall eval, 0, thesrc, [envs]
+        mov     thedest, eax
+        stdcall isAtom, eax
+        cmp     eax, FALSE
+        je      type_error
+    if structtype eq Number
+        stdcall isNumber, thedest
+        cmp     eax, FALSE
+        je      type_error
+    else if structtype eq String
+        cmp     [thedest+NODE.type], STRING
+        jne     type_error
+    else
+        cmp     [thedest+NODE.type], CHAR
+        jne     type_error
+    end if
+}
+
+macro cmpNodeStruct cmptype, structtype {
+    local .start_loop, .end_loop, .return_false, .exit
+        mov     esi, [args]
+        mov     eax, [head]
+        cmp     esi, 0
+        je      argnum_error
+        cmp     [esi+NODE.next], eax
+        je      argnum_error
+        toCheckCmpNode ebx, esi, structtype
+    .start_loop:
+        mov     edi, [esi+NODE.next]
+        cmp     edi, [head]
+        je      .end_loop
+        toCheckCmpNode ecx, edi, structtype
+        stdcall cmptype#structtype, [ebx+NODE.value], [ecx+NODE.value]
+        mov     ebx, ecx
+        cmp     eax, FALSE
+        je      .return_false
+        mov     esi, edi
+        jmp     .start_loop
+    .end_loop:
+        stdcall true
+        jmp     .exit
+    .return_false:
+        stdcall false
+    .exit:
+}
+
+macro procCmpsNode cmptype, structtype {
+    proc cmptype#Node#structtype uses esi edi ebx ecx edx, head, args, envs
+        cmpNodeStruct cmptype, structtype
+        ret
+    endp
+}
+
+procCmpsNode less,      Number
+procCmpsNode lessEqual, Number
+procCmpsNode more,      Number
+procCmpsNode moreEqual, Number
+
+procCmpsNode less,      String
+procCmpsNode lessEqual, String
+procCmpsNode more,      String
+procCmpsNode moreEqual, String
+
+procCmpsNode less,      Char
+procCmpsNode lessEqual, Char
+procCmpsNode more,      Char
+procCmpsNode moreEqual, Char

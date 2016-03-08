@@ -44,29 +44,6 @@ struct CHARSTRUCT
     hString dd  ?
 ends
 
-macro FAILCHK {
-    local .next
-        push    eax
-        cmp     eax, NULL
-        jne     .next
-        invoke  GetLastError
-        cmp     eax, 0
-        je      .next
-        jmp     exit
-    .next:
-        pop     eax
-}
-
-macro memalloc allocsize {
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, allocsize
-        FAILCHK
-}
-
-macro memfree memlocation {
-        invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, memlocation
-        FAILCHK
-}
-
 HEAPFLAG    equ HEAP_ZERO_MEMORY + HEAP_NO_SERIALIZE
 
 calcprnths  dd  0
