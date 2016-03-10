@@ -45,6 +45,7 @@ lesschrname du  'char<?',0
 leqchrname  du  'char<=?',0
 morechrname du  'char>?',0
 meqchrname  du  'char>=?',0
+qquotename  du  'quasiquote',0
 primconst   du  '(setq null (quote ()) true (quote #t) false (quote #f) '
             du  '#f (quote #f) #t (quote #t))',0
 
@@ -103,6 +104,7 @@ macro initPrimFunTable {
         addFun  leqchrname, lessEqualNodeChar
         addFun  morechrname, moreNodeChar
         addFun  meqchrname, moreEqualNodeChar
+        addFun  qquotename, quasiquote
 
         stdcall readExpression, primconst
         mov     ebx, eax
@@ -413,6 +415,32 @@ proc isAtom, atom
         ret
 endp
 
+proc isList, elems
+        stdcall isAtom, [elems]
+        cmp     eax, TRUE
+        je      .is_false
+        stdcall isNull, [elems]
+        cmp     eax, TRUE
+        je      .is_false
+        mov     eax, [elems]
+        mov     eax, [eax+NODE.type]
+        cmp     eax, LIST
+        je      .is_true
+        cmp     eax, PAIR
+        je      .is_true
+        cmp     eax, LAMBDA
+        je      .is_false
+        cmp     eax, FUNCTION
+        je      .is_false
+    .is_true:
+        mov     eax, TRUE
+        jmp     .exit
+    .is_false:
+        mov     eax, FALSE
+    .exit:
+        ret
+endp
+
 macro makeBool {
         lea     esi, [toread]
         stdcall readExpression, esi
@@ -452,14 +480,13 @@ proc isTrue uses ebx, thenode
         stdcall equalNode, [thenode], eax
         cmp     eax, TRUE
         je      @f
-        stdcall removeNode, ebx
         mov     eax, TRUE
         jmp     .exit
     @@:
-        stdcall removeNode, ebx
     .is_false:
         mov     eax, FALSE
     .exit:
+        stdcall removeNode, ebx
         ret
 endp
 
@@ -1355,6 +1382,7 @@ macro numToFinish floattype {
         stdcall allocateNode, eax, INTEGER
         ret
         .to_long:
+        pop     eax
         fild    qword [int64_max]
         fcomip  st, st1
         jc      overflow_error
@@ -1742,3 +1770,182 @@ procCmpsNode less,      Char
 procCmpsNode lessEqual, Char
 procCmpsNode more,      Char
 procCmpsNode moreEqual, Char
+
+qquotecount dd 0
+proc quasiquote uses esi edi ebx ecx, hQQuote, results, envs
+        ;local   header:DWORD
+        inc     [qquotecount]
+        ;memalloc sizeof.NODE
+        ;mov     [header], eax
+        mov     esi, [results]
+        mov     eax, [hQQuote]
+        cmp     esi, 0
+        je      argnum_error
+        cmp     [esi+NODE.next], 0
+        je      argnum_error
+        cmp     [esi+NODE.next], eax
+        jne     argnum_error
+        stdcall isAtom, esi
+        cmp     eax, TRUE
+        je      .return_as_is
+        stdcall isNull, esi
+        cmp     eax, TRUE
+        je      .return_as_is
+        stdcall isList, esi
+        cmp     eax, FALSE
+        je      .return_as_is
+    .as_list:
+        stdcall qqlist, [esi+NODE.value], [envs]
+        cmp     [eax+NODE.next], 0
+        je      @f
+        stdcall allocateNode, eax, LIST
+    @@:
+        jmp     .exit
+    .return_as_is:
+        stdcall cpyNode, [results]
+    .exit:
+        dec     [qquotecount]
+        ret
+endp
+
+macro tosamewithname thesrcsym {
+    local .return_false, .exit
+        mov     esi, [symbolnode]
+        stdcall readExpression, thesrcsym
+        mov     ebx, eax
+        stdcall equalSymbol, [esi+NODE.value], [eax+NODE.value]
+        cmp     eax, TRUE
+        je      .exit
+    .return_false:
+        mov     eax, FALSE
+    .exit:
+        stdcall removeNode, ebx
+}
+
+proc samewithunqname uses esi edi ebx, symbolnode
+        locals
+            unqname du 'unquote',0
+        endl
+        lea     edi, [unqname]
+        tosamewithname edi
+        ret
+endp
+
+proc samewithqqname uses esi edi ebx, symbolnode
+        tosamewithname qquotename
+        ret
+endp
+
+proc samewithunqsname uses esi edi ebx, symbolnode
+        locals
+            unqname du 'unquote-splicing',0
+        endl
+        lea     edi, [unqname]
+        tosamewithname edi
+        ret
+endp
+
+macro splicinglist thedest, thesrc {
+    local .splicing, .end_splicing
+        push    ebx ecx
+        mov     ebx, thesrc
+        mov     ecx, thesrc
+    .splicing:
+        stdcall cpyNode, ecx
+        stdcall pushNode, thedest, eax
+        mov     ecx, [ecx+NODE.next]
+        cmp     ecx, 0
+        je      .end_splicing
+        cmp     ecx, ebx
+        jne     .splicing
+    .end_splicing:
+        stdcall removeNode, edx
+        pop     ecx edx
+}
+
+proc qqlist uses esi edi ebx ecx edx, elems, envs
+        local header:DWORD, inlist:BYTE
+        mov     [inlist], FALSE
+        memalloc sizeof.NODE
+        mov     [header], eax
+        mov     esi, [elems]
+        mov     edi, esi
+    .start_loop:
+        stdcall isList, esi
+        cmp     eax, TRUE
+        jne     @f
+        stdcall qqlist, [esi+NODE.value], [envs]
+        cmp     [eax+NODE.type], LIST
+        je      .proceed_to_next
+        cmp     [eax+NODE.next], 0
+        je      .proceed_to_next
+        splicinglist [header], eax
+        jmp     .next_loop
+      .proceed_to_next:
+        stdcall pushNode, [header], eax
+        jmp     .next_loop
+    @@:
+        stdcall samewithunqname, esi
+        cmp     eax, TRUE
+        jne     @f
+        ;; process unquote
+        cmp     [qquotecount], 1
+        jg      .bypass
+        stdcall eval, 0, [esi+NODE.next], [envs]
+        stdcall pushNode, [header], eax
+        mov     esi, [esi+NODE.next]
+        jmp     .exit
+        jmp     .next_loop
+    @@:
+        stdcall samewithunqsname, esi
+        cmp     eax, TRUE
+        jne     @f
+        ;; process unquote-splicing
+        cmp     [qquotecount], 1
+        jg      .bypass
+        stdcall eval, 0, [esi+NODE.next], [envs]
+        mov     edx, eax
+        cmp     [eax+NODE.type], LIST
+        ;jmp     .not_splicing
+        jne     .not_splicing
+        splicinglist [header], [eax+NODE.value]
+        mov     esi, [esi+NODE.next]
+        jmp     .exit
+        ;jmp     .next_loop
+      .not_splicing:
+        stdcall pushNode, [header], eax
+        jmp     .exit
+    @@:
+        stdcall samewithqqname, esi
+        cmp     eax, TRUE
+        jne     @f
+        ;; process quasiquoting again
+        stdcall cpyNode, esi
+        stdcall pushNode, [header], eax
+        stdcall quasiquote, esi, [esi+NODE.next], [envs]
+        stdcall pushNode, [header], eax
+        mov     esi, [esi+NODE.next]
+        jmp     .next_loop
+    @@:
+        jmp     .copy_node
+    .bypass:
+        dec     [qquotecount]
+    .copy_node:
+        stdcall cpyNode, esi
+        stdcall pushNode, [header], eax
+    .next_loop:
+        cmp     [esi+NODE.type], LIST
+        jne     @f
+        mov     [inlist], TRUE
+    @@:
+        mov     esi, [esi+NODE.next]
+        cmp     esi, edi
+        jne     .start_loop
+    .exit:
+        mov     eax, [header]
+        cmp     [inlist], TRUE
+        jne     .not_list
+        stdcall allocateNode, eax, LIST
+      .not_list:
+        ret
+endp

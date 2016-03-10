@@ -45,10 +45,36 @@ include 'variables.inc'
 ;str1 du '(string<=? "helli" "hello")',0
 ;str1 du '(string>? "helli" "hello")',0
 ;str1 du '(string>=? "helli" "hello")',0
-str1 du '(string>=? "hello" "hello")',0
+;str1 du '(string>=? "hello" "hello")',0
+;str1 du '(quasiquote hello)',0
+;str1 du '(quasiquote (quote hello))',0
+;str1 du '(quasiquote (unquote (+ 1 2)))',0
+;str1 du '(quasiquote (list (unquote (+ 1 2)) 4))',0
+;str1 du '((lambda (name) (quasiquote (list (unquote name) (quote '
+     ;du '(unquote name))))) (quote a))',0
+;str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ())) (true '
+     ;du '(cons (f (car x)) (map f (cdr x))))))) (map abs (quote '
+     ;du '(4 -5 6))))',0
+;str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ())) (true '
+     ;du '(cons (f (car x)) (map f (cdr x))))))) (quasiquote (a (unquote '
+     ;du '(+ 1 2)) (unquote-splicing (map abs (quote (4 -5 6)))) b)))',0
+;str1 du '(quote (hello . world))',0
+;str1 du '(quasiquote ((foo (unquote (- 10 3))) (cons (unquote-splicing'
+     ;du ' (cdr (quote (c)))) (unquote (car (quote (cons)))))))',0
+;str1 du '(quasiquote (cons (foo (unquote (- 10 3))) (cons ('
+     ;du 'unquote-splicing (cdr (quote (c)))) (unquote (car (quote '
+     ;du ' (cons)))))))',0
+;str1 du '(cons (quote (foo 7)) (car (quote (cons))))',0
+;str1 du '(quasiquote ((foo (unquote (- 10 3))) (unquote-splicing (cdr '
+     ;du '(quote (c)))) . (unquote (car (quote (cons))))))',0
+;str1 du '(quasiquote (a (quasiquote (b (unquote (foo (unquote (+ 1 3)) d))'
+     ;du ' e)) f))',0
+str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ()))'
+     du ' (true (cons (f (car x)) (map f (cdr x))))))) '
+     du '(quasiquote (10 5 (unquote (sqrt 4)) (unquote-splicing ('
+     du 'map sqrt (quote (16 9)))) 8)))',0
+
 lenstr1 = $ - str1
-;str1    du  '1.45e10',0
-;str2    du  '1.45',0
 
 theresult du '=> ',0
 
