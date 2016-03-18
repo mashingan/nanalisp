@@ -61,6 +61,27 @@ proc getAllChars uses esi edi ebx, instr, outstr, chr:WORD
         ret
 endp
 
+macro togettoken [funcname, thechar] {
+    common x = 0
+    forward x = x + 1
+    common b = 0
+    forward
+        b = b + 1
+    @@:
+    if ~ thechar eq
+        cmp     word [esi], thechar
+        jne     @f
+    end if
+        stdcall get#funcname, esi, edi
+        add     ebx, eax
+        lea     eax, [eax*2]
+        add     esi, eax
+        add     edi, eax
+    if b <> x
+        jmp     .endloop
+    end if
+}
+
 proc getToken uses esi edi ebx ecx, instr, outstr
         mov     esi, [instr]
         mov     edi, [outstr]
@@ -73,30 +94,10 @@ proc getToken uses esi edi ebx ecx, instr, outstr
         inc2    esi
         inc     ebx
         jmp     .startloop
-    @@:
-        cmp     word [esi], '"'
-        jne     @f
-        stdcall getString, esi, edi
-        add     ebx, eax
-        lea     eax, [eax*2]
-        add     esi, eax
-        add     edi, eax
-        jmp     .endloop
-    @@:
-        cmp     word [esi], '('
-        jne     @f
-        stdcall getWithinParenthesis, esi, edi
-        add     ebx, eax
-        lea     eax, [eax*2]
-        add     esi, eax
-        add     edi, eax
-        jmp     .endloop
-    @@:
-        stdcall getSymbol, esi, edi
-        add     ebx, eax
-        lea     eax, [eax*2]
-        add     esi, eax
-        add     edi, eax
+    togettoken\
+        String, '"',\
+        WithinParenthesis, '(',\
+        Symbol
     .endloop:
         mov     word [edi], 0
         mov     eax, ebx
@@ -337,5 +338,137 @@ proc normalizeInput uses esi edi eax, thestr
         inc2    esi
         jmp     .startloop
     .exit:
+        ret
+endp
+
+macro appendstring dst, src {
+    local .start_copying, .stop_copying
+        lea     edx, src
+      .start_copying:
+        mov     ax, [edx]
+        cmp     ax, 0
+        je      .stop_copying
+        mov     [dst], ax
+        inc2w   dst, edx
+        jmp     .start_copying
+      .stop_copying:
+}
+
+;macro ischeckconvert [chr] {
+        ;cmp     word [esi], chr
+        ;je      .exit
+;}
+
+proc isConvertAgain uses esi, thestr
+        mov     eax, TRUE
+        mov     esi, [thestr]
+        ;ischeckconvert "'", '`', ',', '@'
+        stdcall identify, esi
+        cmp     eax, LIST
+        jne     .is_false
+        mov     eax, TRUE
+        jmp     .exit
+    .is_false:
+        mov     eax, FALSE
+    .exit:
+        ret
+endp
+
+macro toconvertagain towhere, [chr] {
+        cmp     word [edi], chr
+        je      towhere
+}
+
+macro appendquotes [chr, quotetype] {
+    local .not_list, .close_prnt, .convert_again
+    @@:
+        cmp     word [edi], chr
+        jne     @f
+        inc2    edi
+        appendstring esi, [quotetype]
+        toconvertagain .convert_again, "'", '`', ',', '@'
+        push    edi
+        stdcall getToken, edi, [bufdum]
+        mov     ebx, eax
+        stdcall isConvertAgain, [bufdum]
+        cmp     eax, TRUE
+        jne     .not_list
+        stdcall convertToQuote, [bufdum]
+        mov     edi, [bufdum]
+        invoke  lstrlenW, edi
+        mov     ecx, eax
+        xchg    esi, edi
+        rep     movsw
+        xchg    esi, edi
+        pop     edi
+        lea     ebx, [ebx*2]
+        add     edi, ebx
+        jmp     .close_prnt
+    .convert_again:
+        mov     [bufdum], edi
+        stdcall convertToQuote, [bufdum]
+        invoke  lstrlenW, [bufdum]
+        mov     ecx, eax
+        xchg    esi, edi
+        rep     movsw
+        xchg    esi, edi
+        jmp     .close_prnt
+    .not_list:
+        pop     edi
+        xchg    esi, edi
+        mov     ecx, ebx
+        rep     movsw
+        xchg    esi, edi
+    .close_prnt:
+        appendstring esi, [clsprnt]
+        jmp     .next_loop
+    @@:
+}
+
+proc convertToQuote uses esi edi eax ebx ecx edx, thestring
+        locals
+            buffer  dd  0
+            bufdum  dd  0
+            thq     du  '(quote ',0
+            thqq    du  '(quasiquote ',0
+            thuq    du  '(unquote ',0
+            thuqs   du  '(unquote-splicing ',0
+            clsprnt du  ')',0
+        endl
+        memalloc MAXBUFFER shl 1
+        mov     [bufdum], eax
+        memalloc MAXBUFFER shl 1
+        mov     [buffer], eax
+        mov     esi, [thestring]
+        invoke  lstrlenW, [thestring]
+        mov     ecx, eax
+        mov     edi, [buffer]
+        rep     movsw
+        mov     esi, [thestring]
+        mov     edi, [buffer]
+    .start_loop:
+        cmp     word [edi], 0
+        je      .end_loop
+        appendquotes\
+            "'", thq,\
+            '`', thqq
+        cmp     word [edi], ','
+        jne     @f
+        cmp     word [edi+2], '@'
+        jne     .not_splicing
+        inc2    edi
+        appendquotes '@', thuqs
+        jmp     .next_loop
+      .not_splicing:
+        appendquotes ',', thuq
+    @@:
+    .next_loop:
+        mov     ax, [edi]
+        mov     word [esi], ax
+        inc2w   esi, edi
+        jmp     .start_loop
+    .end_loop:
+        mov     word [edi+2], 0
+        memfree [buffer]
         ret
 endp

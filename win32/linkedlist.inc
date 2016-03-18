@@ -44,8 +44,6 @@ struct CHARSTRUCT
     hString dd  ?
 ends
 
-HEAPFLAG    equ HEAP_ZERO_MEMORY + HEAP_NO_SERIALIZE
-
 calcprnths  dd  0
 prtnopen    du  '('
 prtnopenln = $ - prtnopen
@@ -370,10 +368,65 @@ proc allocateVariable uses esi ebx ecx edx, symbolnode
         ret
 endp
 
-proc printList uses esi edi eax ebx ecx, theout, theheader
+macro toprintcontrol thesrc, theout {
+        stdcall readExpression, thesrc
+        stdcall printNode, theout, eax
+        stdcall removeNode, eax
+}
+
+macro toprintprocs name, [chars] {
+    common
+    proc print#name uses esi eax, theout
+        locals
+            thechar du chars,0
+        endl
+        lea     esi, [thechar]
+        toprintcontrol esi, [theout]
+        ret
+    endp
+}
+
+toprintprocs Quote,     "'"
+toprintprocs QQuote,    '`'
+toprintprocs Unquote,   ','
+toprintprocs Unqs,      ',@'    ; unquote-splicing
+
+macro tocheckcontrols theheader, [typename, cmpname] {
+    forward
+    local .next_point
+        mov     esi, theheader
+        cmp     [esi+NODE.type], SYMBOL
+        jne     .next_point
+        stdcall samewith#cmpname#name, [esi+NODE.value]
+        cmp     eax, TRUE
+        jne     .next_point
+        stdcall print#typename, [theout]
+        mov     [toprintprntn], FALSE
+        mov     esi, [esi+NODE.next]
+        cmp     esi, 0
+        je      .exit
+        jmp     .proceed_next
+    .next_point:
+}
+
+macro toprintlist listtype {
+    local .listtype
+    .listtype equ listtype
+        tocheckcontrols [theheader],\
+            Quote,   q,\
+            QQuote,  qq,\
+            Unquote, unq,\
+            Unqs,    unqs
+    @@:
+    .proceed_next:
+        cmp     [toprintprntn], TRUE
+        jne     @f
         openprntn [theout]
-        mov     esi, [theheader]
-        mov     ebx, esi
+    @@:
+        mov     ebx, [theheader]
+    if .listtype eq Pair
+        mov     ebx, [ebx+NODE.prev]
+    end if
     .startloop:
         stdcall printNode, [theout], esi
         cmp     [esi+NODE.next], NULL
@@ -384,24 +437,7 @@ proc printList uses esi edi eax ebx ecx, theout, theheader
         mov     esi, [esi+NODE.next]
         jmp     .startloop
     .exit:
-        closeprntn [theout]
-        ret
-endp
-
-proc printPair uses esi edi eax ebx ecx edx, theout, theheader
-        openprntn [theout]
-        mov     esi, [theheader]
-        mov     edi, [esi+NODE.prev]
-    .startloop:
-        stdcall printNode, [theout], esi
-        cmp     [esi+NODE.next], NULL
-        je      .exit
-        cmp     [esi+NODE.next], edi
-        je      .exit
-        spacing [theout]
-        mov     esi, [esi+NODE.next]
-        jmp     .startloop
-    .exit:
+    if .listtype eq Pair
         mov     eax, [esi+NODE.next]
         cmp     [eax+NODE.type], LIST
         je      @f
@@ -411,9 +447,25 @@ proc printPair uses esi edi eax ebx ecx edx, theout, theheader
     @@:
         spacing [theout]
         stdcall printNode, [theout], eax
+    end if
+        cmp     [toprintprntn], TRUE
+        jne     @f
         closeprntn [theout]
+    @@:
+}
+
+macro printlistprocs listtype {
+    proc print#listtype uses esi edi eax ebx ecx, theout, theheader
+        locals
+            toprintprntn db TRUE
+        endl
+        toprintlist listtype
         ret
-endp
+    endp
+}
+
+printlistprocs List
+printlistprocs Pair
 
 macro printingNode [thetype, thename] {
         cmp     eax, thetype
@@ -481,7 +533,7 @@ proc printInteger uses esi edi eax ecx edx, theout, thenum
         mov     eax, [esi+NUMBERSTRUCT.value]
         mov     eax, [eax]
         stdcall convertFromInteger, eax, [hDummy]
-        writeIt [outhnd], [hDummy]
+        writeIt [hDummy]
         ret
 endp
 

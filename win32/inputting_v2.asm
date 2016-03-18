@@ -12,6 +12,8 @@ MAXBUFFER = 512
 section '.data' data readable writeable
 include 'variables.inc'
 
+theresult du '=> ',0
+
 ;; WRONG
 ;str1    du '(progn (setq hello (lambda () (display "hello world")'
         ;du ' (hello)))'
@@ -52,6 +54,7 @@ include 'variables.inc'
 ;str1 du '(quasiquote (list (unquote (+ 1 2)) 4))',0
 ;str1 du '((lambda (name) (quasiquote (list (unquote name) (quote '
      ;du '(unquote name))))) (quote a))',0
+;str1 du "((lambda (name) `(list (unquote name) ',name)) 'a)",0
 ;str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ())) (true '
      ;du '(cons (f (car x)) (map f (cdr x))))))) (map abs (quote '
      ;du '(4 -5 6))))',0
@@ -67,16 +70,35 @@ include 'variables.inc'
 ;str1 du '(cons (quote (foo 7)) (car (quote (cons))))',0
 ;str1 du '(quasiquote ((foo (unquote (- 10 3))) (unquote-splicing (cdr '
      ;du '(quote (c)))) . (unquote (car (quote (cons))))))',0
+;str1 du "`((foo ,(- 10 3) ,@(cdr '(c))) . (unquote (car '(cons))))",0
 ;str1 du '(quasiquote (a (quasiquote (b (unquote (foo (unquote (+ 1 3)) d))'
      ;du ' e)) f))',0
-str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ()))'
-     du ' (true (cons (f (car x)) (map f (cdr x))))))) '
-     du '(quasiquote (10 5 (unquote (sqrt 4)) (unquote-splicing ('
-     du 'map sqrt (quote (16 9)))) 8)))',0
+;str1 du '`(a `(b ,(foo ,(+ 1 3) d) e) f)',0
+;str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ()))'
+     ;du ' (true (cons (f (car x)) (map f (cdr x))))))) '
+     ;du '(quasiquote (10 5 (unquote (sqrt 4)) (unquote-splicing ('
+     ;du 'map sqrt (quote (16 9)))) 8)))',0
+;str1 du "(begin (setf map (lambda (f x) (cond ((null? x) '())"
+     ;du " (true (cons (f (car x)) (map f (cdr x))))))) "
+     ;du "`(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8))",0
+;str1 du '(quasiquote (quote hello-world))',0
+;str1 du "(quote (hello-world))",0
+;str1 du "'hello-world",0
+;str1 du "'(hello world)",0
+;str1 du "(quasiquote '(hello-world))",0
+;str1 du "'()",0
+;str1 du "(begin (set! greeting #t) (cond (greeting 'hello-world)"
+     ;du " (true 'nice-day)))",0
+;str1 du "(begin (setf hello 'world) `(hello ,hello nice day))",0
+;str1 du "''hello",0
+;str1 du "''(hello)",0
+str1 du "(begin (setf name 'andy) `'(,name))",0
+;str1 du "(quasiquote (quote (hello-world)))",0
+;str1 du "`'(hello-world)",0
+;str1 du "(quasiquote ((hello world)))",0
+;str1 du '`((hello world))',0
 
 lenstr1 = $ - str1
-
-theresult du '=> ',0
 
 section '.text' code readable executable
 start:
@@ -89,12 +111,17 @@ start:
         cmp     [parenthesis], 0
         jne     .invalid_expression
         stdcall normalizeInput, str1
+        stdcall convertToQuote, str1
+        writeLn str1
+        stdcall  checkInput, str1
+        cmp     [parenthesis], 0
+        jne     .invalid_expression
         stdcall readExpression, str1
         mov     ebx, eax
         checkNode eax
         stdcall eval, 0, eax, 0
         push    eax ebx
-        writeIt [outhnd], theresult
+        writeIt theresult
         pop     ebx eax
         checkNode eax
         stdcall removeNode, eax
@@ -104,7 +131,7 @@ start:
         xor     eax, eax
         jmp     finish
     .invalid_expression:
-        writeLn [outhnd], invldexprerror
+        writeLn invldexprerror
         mov     eax, INVALID_EXPRESSION_ERROR
         jmp     exit
     
@@ -154,7 +181,7 @@ proc checkVARLIST uses esi edi eax ebx ecx edx, varlist
         je      @f              ; No variables list
         stdcall printNode, [outhnd], eax
         lea     edi, [colon]
-        writeIt [outhnd], edi   ; Only protects protected-registers
+        writeIt edi   ; Only protects protected-registers
         mov     eax, [esi+VARIABLESTRUCT.hValue]
         cmp     eax, 0
         je      .null_value
@@ -170,7 +197,7 @@ proc checkVARLIST uses esi edi eax ebx ecx edx, varlist
         je      @f
         jmp     @b
     @@:
-        newline [outhnd]
+        newline
     .exit:
         ret
 endp

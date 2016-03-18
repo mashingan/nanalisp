@@ -1831,7 +1831,12 @@ proc samewithunqname uses esi edi ebx, symbolnode
         ret
 endp
 
-proc samewithqqname uses esi edi ebx, symbolnode
+proc samewithqname uses esi ebx, symbolnode
+        tosamewithname quotename
+        ret
+endp
+
+proc samewithqqname uses esi ebx, symbolnode
         tosamewithname qquotename
         ret
 endp
@@ -1863,6 +1868,32 @@ macro splicinglist thedest, thesrc {
         pop     ecx edx
 }
 
+macro checkingquotes [funname] {
+    common local .exit, .finish, .return_true
+        cmp     [esi+NODE.next], 0
+        je      .return_true
+        mov     eax, [esi+NODE.next]
+        cmp     eax, [esi+NODE.prev]
+        jne     .return_true
+    forward
+        stdcall samewith#funname#name, esi
+        cmp     eax, TRUE
+        je      .finish
+    common
+    .return_true:
+        mov     eax, TRUE
+        jmp     .exit
+    .finish:
+        mov     eax, FALSE
+    .exit:
+}
+
+proc tobelist uses esi, listinternal
+        mov     esi, [listinternal]
+        checkingquotes unq, unqs
+        ret
+endp
+
 proc qqlist uses esi edi ebx ecx edx, elems, envs
         local header:DWORD, inlist:BYTE
         mov     [inlist], FALSE
@@ -1874,14 +1905,29 @@ proc qqlist uses esi edi ebx ecx edx, elems, envs
         stdcall isList, esi
         cmp     eax, TRUE
         jne     @f
+        stdcall tobelist, [esi+NODE.value]
+        mov     ebx, eax
         stdcall qqlist, [esi+NODE.value], [envs]
+        checkItr ebx
+        checkNode esi
+        checkNode eax
+        checkItr [eax+NODE.type]
+        okexecuted
         cmp     [eax+NODE.type], LIST
-        je      .proceed_to_next
+        ;je      .proceed_to_next
+        je      .no_need_for_list
         cmp     [eax+NODE.next], 0
         je      .proceed_to_next
+        cmp     ebx, TRUE
+        je      .need_for_list
         splicinglist [header], eax
         jmp     .next_loop
       .proceed_to_next:
+        cmp     ebx, TRUE
+        jne     .no_need_for_list
+        .need_for_list:
+        stdcall allocateNode, eax, LIST
+        .no_need_for_list:
         stdcall pushNode, [header], eax
         jmp     .next_loop
     @@:
@@ -1895,7 +1941,6 @@ proc qqlist uses esi edi ebx ecx edx, elems, envs
         stdcall pushNode, [header], eax
         mov     esi, [esi+NODE.next]
         jmp     .exit
-        jmp     .next_loop
     @@:
         stdcall samewithunqsname, esi
         cmp     eax, TRUE
@@ -1906,12 +1951,10 @@ proc qqlist uses esi edi ebx ecx edx, elems, envs
         stdcall eval, 0, [esi+NODE.next], [envs]
         mov     edx, eax
         cmp     [eax+NODE.type], LIST
-        ;jmp     .not_splicing
         jne     .not_splicing
         splicinglist [header], [eax+NODE.value]
         mov     esi, [esi+NODE.next]
         jmp     .exit
-        ;jmp     .next_loop
       .not_splicing:
         stdcall pushNode, [header], eax
         jmp     .exit
@@ -1939,6 +1982,8 @@ proc qqlist uses esi edi ebx ecx edx, elems, envs
         mov     [inlist], TRUE
     @@:
         mov     esi, [esi+NODE.next]
+        cmp     esi, 0
+        je      .exit
         cmp     esi, edi
         jne     .start_loop
     .exit:

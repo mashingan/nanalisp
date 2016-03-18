@@ -1,20 +1,20 @@
 nwln du  13,10
 lnnwln = $ - nwln
-macro newline thestdout {
+macro newline {
         pushad
-        invoke  WriteConsoleW, thestdout, nwln, lnnwln shr 1, numwrtn, 0
+        invoke  WriteConsoleW, [outhnd], nwln, lnnwln shr 1, numwrtn, 0
         popad
 }
 
-macro writeIt thehandle, thestr {
+macro writeIt thestr {
         invoke  lstrlenW, thestr
-        invoke  WriteConsoleW, thehandle, thestr, eax, numwrtn, 0
+        invoke  WriteConsoleW, [outhnd], thestr, eax, numwrtn, 0
 }
 
-macro writeLn thehandle, thestr {
+macro writeLn thestr {
         pushad
-        writeIt thehandle, thestr
-        newline thehandle
+        writeIt thestr
+        newline
         popad
 }
 
@@ -29,7 +29,7 @@ macro okexecuted {
 macro checkItr value {
         pushad
         stdcall convertFromInteger, value, [hDummy]
-        writeLn [outhnd], [hDummy]
+        writeLn [hDummy]
         popad
 }
 
@@ -45,7 +45,7 @@ macro clearBuffer thestr, len {
     xor     eax, eax
     rep     stosw
     popad
-}
+
 
 memfmt du 'The memory value is %p',0
 macro memval [theholder] {
@@ -55,7 +55,7 @@ macro memval [theholder] {
     forward
         display 'forward '
         cinvoke wprintf, memfmt, theholder
-        newline [outhnd]
+        newline
     common
         display 'common 2',13,10
         popad
@@ -66,7 +66,7 @@ macro checkNode [thenodes] {
         pushad
     forward
         stdcall printNode, [outhnd], thenodes
-        newline [outhnd]
+        newline
     common
         popad
 }
@@ -85,7 +85,7 @@ macro checkList [thelist] {
         pushad
     forward
         stdcall printList, [outhnd], thelist
-        newline [outhnd]
+        newline
     common
         popad
 }
@@ -116,6 +116,8 @@ macro FAILCHK {
     .next:
         pop     eax
 }
+
+HEAPFLAG    equ HEAP_ZERO_MEMORY + HEAP_NO_SERIALIZE
 
 macro memalloc allocsize {
         invoke  HeapAlloc, [procHeap], HEAPFLAG, allocsize
@@ -177,7 +179,7 @@ macro cleanupProgram {
 
 macro the_error [labels, msgaddr, errtype] {
     labels:
-        writeLn [outhnd], msgaddr
+        writeLn msgaddr
         checkFUNSTACKTRACE
         mov     eax, errtype
         jmp     finish
