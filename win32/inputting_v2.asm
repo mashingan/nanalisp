@@ -54,7 +54,7 @@ theresult du '=> ',0
 ;str1 du '(quasiquote (list (unquote (+ 1 2)) 4))',0
 ;str1 du '((lambda (name) (quasiquote (list (unquote name) (quote '
      ;du '(unquote name))))) (quote a))',0
-;str1 du "((lambda (name) `(list (unquote name) ',name)) 'a)",0
+str1 du "((lambda (name) `(list (unquote name) ',name)) 'a)",0
 ;str1 du '(begin (setf map (lambda (f x) (cond ((null? x) (quote ())) (true '
      ;du '(cons (f (car x)) (map f (cdr x))))))) (map abs (quote '
      ;du '(4 -5 6))))',0
@@ -92,11 +92,14 @@ theresult du '=> ',0
 ;str1 du "(begin (setf hello 'world) `(hello ,hello nice day))",0
 ;str1 du "''hello",0
 ;str1 du "''(hello)",0
-str1 du "(begin (setf name 'andy) `'(,name))",0
+;str1 du "(begin (setf name 'andy) `'(,name))",0
 ;str1 du "(quasiquote (quote (hello-world)))",0
 ;str1 du "`'(hello-world)",0
 ;str1 du "(quasiquote ((hello world)))",0
 ;str1 du '`((hello world))',0
+;str1 du "(setq 'hello 'world)",0
+;str1 du "(+ '(hello) 4)",0
+;str1 du "(<= 5 'hello)",0
 
 lenstr1 = $ - str1
 
@@ -104,34 +107,74 @@ section '.text' code readable executable
 start:
         initProgram
 
-        stdcall varlistLength, PRIMFUNTABLE
-        checkItr eax
-        checkItr lenstr1
-        stdcall checkInput, str1
+    .startloop:    ; total 42 lines
+        mov     edi, [hBuffin]
+        clearBuffer edi, MAXBUFFER
+        writeIt prompt
+        mov     edx, 0
+    @@:
+        mov     esi, [hBuffin]
+        lea     esi, [esi+edx]
+        invoke  ReadConsoleW, [inhnd], esi, MAXBUFFER, numwrtn, 0
+        stdcall checkInput, esi
+        invoke  lstrlenW, edi
+        lea     eax, [eax*2]
+        mov     edx, eax
+        cmp     [numwrtn], 2
+        je      @b
+        cmp     byte [aphostrophs], TRUE
+        je      @b
         cmp     [parenthesis], 0
-        jne     .invalid_expression
-        stdcall normalizeInput, str1
-        stdcall convertToQuote, str1
-        writeLn str1
-        stdcall  checkInput, str1
-        cmp     [parenthesis], 0
-        jne     .invalid_expression
-        stdcall readExpression, str1
-        mov     ebx, eax
-        checkNode eax
-        stdcall eval, 0, eax, 0
-        push    eax ebx
-        writeIt theresult
-        pop     ebx eax
-        checkNode eax
-        stdcall removeNode, eax
-        stdcall removeNode, ebx
-        checkFUNSTACKTRACE
+        jl      .invalid_expression
+        jne     @b
+        stdcall normalizeInput, edi
+        stdcall convertToQuote, edi
+        invoke  lstrlenW, edi
+        lea     eax, [eax*2]
+        mov     word [edi+eax-4], 0
+        ;cinvoke wsprintf, bufout, fmt, buffin
+        ;writeLn [outhnd], bufout
 
-        xor     eax, eax
-        jmp     finish
+        stdcall readExpression, edi
+        mov     ebx, eax
+        stdcall eval, 0, eax, 0
+        checkNode eax
+        ;stdcall removeNode, eax
+    .to_finish:
+        stdcall removeNode, ebx
+        ;checkFUNSTACKTRACE
+        ;cleanFUNSTACKTRACE
+        jmp     .startloop
+
+        ;stdcall varlistLength, PRIMFUNTABLE
+        ;checkItr eax
+        ;checkItr lenstr1
+        ;stdcall checkInput, str1
+        ;cmp     [parenthesis], 0
+        ;jne     .invalid_expression
+        ;stdcall normalizeInput, str1
+        ;stdcall convertToQuote, str1
+        ;writeLn str1
+        ;stdcall  checkInput, str1
+        ;cmp     [parenthesis], 0
+        ;jne     .invalid_expression
+        ;stdcall readExpression, str1
+        ;mov     ebx, eax
+        ;checkNode eax
+        ;stdcall eval, 0, eax, 0
+        ;push    eax ebx
+        ;writeIt theresult
+        ;pop     ebx eax
+        ;checkNode eax
+        ;stdcall removeNode, eax
+    ;.to_finish:
+        ;stdcall removeNode, ebx
+        ;checkFUNSTACKTRACE
+;
+        ;xor     eax, eax
+        ;jmp     finish
     .invalid_expression:
-        writeLn invldexprerror
+        writeLn INVALID_EXPRESSION_ERRORtext
         mov     eax, INVALID_EXPRESSION_ERROR
         jmp     exit
     
@@ -145,13 +188,13 @@ start:
         ret
 
         the_error\
-            no_binding_error, nobindingerror, NO_BINDING_ERROR,\
-            argnum_error, argnumerror, ARGNUM_ERROR,\
-            type_error, typeerror, TYPE_ERROR,\
-            stack_error, stackerror, STACK_OVERFLOW_ERROR,\
-            zero_division_error, zerodiverror, ZERO_DIVISION_ERROR,\
-            unimplemented_error, unimplerror, UNIMPLEMENTED_ERROR,\
-            overflow_error, overflowerror, OVERFLOW_ERROR
+            no_binding_error, NO_BINDING_ERROR,\
+            argnum_error, ARGNUM_ERROR,\
+            type_error, TYPE_ERROR,\
+            stack_error, STACK_OVERFLOW_ERROR,\
+            zero_division_error, ZERO_DIVISION_ERROR,\
+            unimplemented_error, UNIMPLEMENTED_ERROR,\
+            overflow_error, OVERFLOW_ERROR
 
 
 proc initVarTable uses esi eax ebx ecx

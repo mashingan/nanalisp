@@ -310,13 +310,15 @@ proc quote uses esi, hQuote, results, envs
         mov     esi, [results]
         mov     eax, [hQuote]
         cmp     esi, 0
-        je      argnum_error
+        je      .argnum_error
         cmp     [esi+NODE.next], 0
-        je      argnum_error
+        je      .argnum_error
         cmp     [esi+NODE.next], eax
-        jne     argnum_error
+        jne     .argnum_error
         stdcall cpyNode, esi
         ret
+    .argnum_error:
+        argnumErrorJump [hQuote], 1
 endp
 
 proc setq uses esi edi ebx ecx, hSetq, listarg, envs
@@ -326,12 +328,11 @@ proc setq uses esi edi ebx ecx, hSetq, listarg, envs
         cmp     ebx, [esi+NODE.next]
         jne     @f
     .argnum_error:
-        jmp     argnum_error
+        argnumErrorJump [hSetq], 2
     @@:
         cmp     [esi+NODE.type], SYMBOL
         je      @f
-    .type_error:
-        jmp     type_error
+    typeErrorJump esi, SYMBOL
     @@:
         stdcall symbolLength, esi
         dec     eax
@@ -381,7 +382,7 @@ proc cons uses esi edi ebx ecx edx, hCons, atoms, envs
     @@:
     .make_pair:
         push    ebx edx
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NODE
+        memalloc sizeof.NODE
         mov     [header], eax
         pop     edx ebx
         stdcall addNode, eax, ebx
@@ -390,7 +391,7 @@ proc cons uses esi edi ebx ecx edx, hCons, atoms, envs
     .exit:
         ret
     .argnum_error:
-        jmp     argnum_error
+        argnumErrorJump [hCons], 2
 endp
 
 proc isAtom, atom
@@ -492,11 +493,11 @@ endp
 
 proc atomp uses esi, hAtom, atomelem, envs
         cmp     [atomelem], 0
-        je      argnum_error
+        je      .argnum_error
         mov     esi, [atomelem]
         mov     eax, [hAtom]
         cmp     [esi+NODE.next], eax
-        jne     argnum_error
+        jne     .argnum_error
         stdcall eval, 0, esi, [envs]
         stdcall isAtom, eax
         cmp     eax, TRUE
@@ -507,6 +508,8 @@ proc atomp uses esi, hAtom, atomelem, envs
         stdcall true
     .exit:
         ret
+    .argnum_error:
+        argnumErrorJump [hAtom], 1
 endp
 
 proc isNull uses esi, lists
@@ -530,10 +533,10 @@ endp
 proc nullp uses esi, hNullp, lists, envs
         mov     esi, [lists]
         cmp     esi, 0
-        je      argnum_error
+        je      .argnum_error
         mov     eax, [hNullp]
         cmp     [esi+NODE.next], eax
-        jne     argnum_error
+        jne     .argnum_error
         stdcall eval, 0, esi, [envs]
         mov     ebx, eax
         stdcall isAtom, eax
@@ -551,6 +554,8 @@ proc nullp uses esi, hNullp, lists, envs
         stdcall true
     .exit:
         ret
+    .argnum_error:
+        argnumErrorJump [hNullp], 1
 endp
 
 macro toCheckInit struct1, struct2 {
@@ -772,11 +777,11 @@ proc eval uses esi edi ebx ecx edx, hEval, atoms, envs
         mov     ebx, [atoms]
         mov     eax, [hEval]
         cmp     ebx, NULL
-        je      argnum_error
+        je      .argnum_error
         cmp     eax, NULL       ; to check whether eval is invoked
         je      @f              ; internally
         cmp     [ebx+NODE.next], eax    ; to check whether the eval
-        jne     argnum_error           ; invoked from expression has
+        jne     .argnum_error           ; invoked from expression has
     @@:                                 ; correct args
         stdcall isAtom, ebx
         cmp     eax, TRUE
@@ -884,6 +889,8 @@ proc eval uses esi edi ebx ecx edx, hEval, atoms, envs
         mov     eax, [atoms]
     .exit:
         ret
+    .argnum_error:
+        argnumErrorJump [hEval], 1
 endp
 
 proc funcall uses esi ebx ecx, hFuncall, hArgs, envs
@@ -902,7 +909,7 @@ proc funcall uses esi ebx ecx, hFuncall, hArgs, envs
         pop     esi
         stdcall isNull, eax
         cmp     eax, TRUE
-        je      type_error
+        je      .type_error
         cmp     [ecx+NODE.type], LAMBDA
         je      .proc_lambda
     @@:
@@ -929,6 +936,7 @@ proc funcall uses esi ebx ecx, hFuncall, hArgs, envs
     .no_binding_error:
         ;checkNode eax
         jmp     no_binding_error
+    typeErrorJump esi, LIST
 endp
 
 proc quit uses esi ebx, hQuit, hArgs, envs
@@ -943,13 +951,14 @@ proc car uses esi, noarg, thelist, envs
         mov     esi, eax
         stdcall isAtom, eax
         cmp     eax, TRUE
-        je      type_error
+        je      .type_error
         stdcall isNull, esi
         cmp     eax, TRUE
-        je      type_error
+        je      .type_error
         mov     eax, [esi+NODE.value]
         stdcall cpyNode, eax
         ret
+    typeErrorJump esi, LIST
 endp
 
 proc cdr uses esi edi ebx ecx edx, noarg, thelist, envs
@@ -990,16 +999,19 @@ proc cdr uses esi edi ebx ecx edx, noarg, thelist, envs
         mov     eax, ebx
     .exit:
         ret
-    .type_error:
-        jmp     type_error
     .return_null:
         stdcall null
         ;ret
         jmp     .exit
+    typeErrorJump esi, LIST
 endp
 
 proc lambda uses esi edi ebx ecx edx, hLambda, exprs, envs
         local   locvars:DWORD, lmdstruct:DWORD, envs_not_null:BYTE
+        mov     esi, [exprs]
+        mov     esi, [esi+NODE.next]
+        cmp     esi, [hLambda]
+        je      .argnum_error
         mov     [envs_not_null], FALSE
         cmp     [envs], 0
         je      @f
@@ -1011,13 +1023,14 @@ proc lambda uses esi edi ebx ecx edx, hLambda, exprs, envs
         stdcall allocateVariable, NULL
         mov     [locvars], eax
       .init_var_ok:
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.NODE
-        FAILCHK
+        memalloc sizeof.NODE
         mov     [lmdstruct], eax
         mov     [eax+NODE.hMemory], eax
         mov     esi, [exprs]            ; local vars, assumed a list
+        cmp     [esi+NODE.type], LIST
+        jne     .type_error
         mov     ebx, [esi+NODE.next]    ; handles expressions
-        mov     edi, [esi+NODE.value]
+        mov     edi, [esi+NODE.value]   ; TODO: fix on how handling non-list
         mov     ecx, edi
         stdcall isNull, esi
         cmp     eax, TRUE
@@ -1038,8 +1051,7 @@ proc lambda uses esi edi ebx ecx edx, hLambda, exprs, envs
         mov     ebx, [ebx+NODE.next]
         cmp     ebx, [hLambda]
         jne     @b
-        invoke  HeapAlloc, [procHeap], HEAPFLAG, sizeof.LAMBDASTRUCT
-        FAILCHK
+        memalloc sizeof.LAMBDASTRUCT
         mov     [eax+LAMBDASTRUCT.hMemory], eax
         cmp     byte [envs_not_null], TRUE
         jne     @f
@@ -1065,6 +1077,9 @@ proc lambda uses esi edi ebx ecx edx, hLambda, exprs, envs
       @@:
         mov     [locvars], esi
         jmp     .finishing
+    typeErrorJump [exprs], LIST
+    .argnum_error:
+        argnumErrorJump [hLambda], 2
 endp
 
 proc isCurry uses esi ecx edx, vars
@@ -1144,7 +1159,7 @@ proc evalLambda uses esi edi ebx ecx edx, hEval, atoms, envs
     .endbindings:
         mov     eax, [args]
         cmp     [unboundNum], eax
-        jl      argnum_error
+        jl      .argnum_error
         stdcall isCurry, ecx
         cmp     eax, 0
         jne     .make_lambda
@@ -1206,7 +1221,8 @@ proc evalLambda uses esi edi ebx ecx edx, hEval, atoms, envs
         jmp     .proceed_the_lambda
     @@:
         ret
-
+    .argnum_error:
+        argnumErrorJump [hEval], [locvars]
 endp
 
 proc progn uses esi edi ebx ecx edx, stopper, elms, envs
@@ -1233,10 +1249,10 @@ proc length uses esi edi ebx, hLength, thelist, envs
         mov     esi, [thelist]
         mov     eax, [hLength]
         cmp     [esi+NODE.next], eax
-        jne     argnum_error
+        jne     .argnum_error
         stdcall isAtom, esi
         cmp     eax, TRUE
-        je      type_error
+        je      .type_error
         stdcall eval, 0, [thelist], [envs]
         mov     esi, eax
         mov     eax, [eax+NODE.value]
@@ -1258,6 +1274,9 @@ proc length uses esi edi ebx, hLength, thelist, envs
         stdcall allocateInteger, ebx
         stdcall allocateNode, eax, INTEGER
         ret
+    typeErrorJump esi, LIST
+    .argnum_error:
+        argnumErrorJump [hLength], 1
 endp
 
 proc internalLength uses esi ebx ecx edx, nodeslist
@@ -1304,10 +1323,10 @@ endp
 proc cond uses esi edi ebx ecx edx, hCond, args, envs
         mov     esi, [args]
         cmp     esi, 0
-        je      argnum_error
+        je      .argnum_error
         stdcall isAtom, esi
         cmp     eax, TRUE
-        je      type_error
+        je      .type_error
         mov     edx, esi
         mov     ebx, esi
     .startloop:
@@ -1338,6 +1357,9 @@ proc cond uses esi edi ebx ecx edx, hCond, args, envs
     .return_null:
         stdcall null
         jmp     .exit
+    typeErrorJump esi, LIST
+    .argnum_error:
+        argnumErrorJump [hCond], 2
 endp
 
 proc thedisplay, noargs, thenode, envs
@@ -1452,7 +1474,7 @@ macro makeNum command, floattype, onlyonearg, fortan {
         jmp     .start_loop
     @@:
         cmp     [eax+NODE.type], FLOAT
-        jne     type_error
+        jne     .type_error1
         mov     eax, [eax+NODE.value]
         mov     eax, [eax+NUMBERSTRUCT.value]
     if floattype eq
@@ -1480,7 +1502,7 @@ macro makeNum command, floattype, onlyonearg, fortan {
         jmp     .next_loop
     @@:
         cmp     ecx, FLOAT
-        jne     type_error
+        jne     .type_error
     if floattype eq
         mov     [isthisfloat], TRUE
     end if
@@ -1509,6 +1531,10 @@ macro makeNum command, floattype, onlyonearg, fortan {
     .make_lambda:
         numMakeLambda
         ret
+    .type_error1:
+        expectedType eax, NUMBER
+        jmp     type_error
+    typeErrorJump esi, NUMBER
 }
 
 proc addNum uses esi edi ebx ecx edx, head, nums, envs
@@ -1609,15 +1635,15 @@ macro procCmps cmptype, structtype {
     endp
 }
 
-procCmps less,      String
-procCmps lessEqual, String
-procCmps more,      String
-procCmps moreEqual, String
+macro makeProcCmps nametype {
+    procCmps less,      nametype
+    procCmps lessEqual, nametype
+    procCmps more,      nametype
+    procCmps moreEqual, nametype
+}
 
-procCmps less,      Char
-procCmps lessEqual, Char
-procCmps more,      Char
-procCmps moreEqual, Char
+makeProcCmps String
+makeProcCmps Char
 
 macro toCheckNumber what, thesource, towhere, [thetype] {
     common x = 0
@@ -1678,10 +1704,7 @@ macro compareNumber struct1, struct2, cmptype {
     .exit:
 }
 
-procCmps less,      Number
-procCmps lessEqual, Number
-procCmps more,      Number
-procCmps moreEqual, Number
+makeProcCmps Number
 
 macro toCheckIsNumber thenode, [thetype] {
         cmp     [thenode+NODE.type], thetype
@@ -1703,32 +1726,46 @@ proc isNumber uses esi edi ebx ecx edx, thenode
 endp
 
 macro toCheckCmpNode thedest, thesrc, structtype {
+    local .type_error, .safe_type
         stdcall eval, 0, thesrc, [envs]
         mov     thedest, eax
         stdcall isAtom, eax
         cmp     eax, FALSE
-        je      type_error
+        je      .type_error
     if structtype eq Number
         stdcall isNumber, thedest
         cmp     eax, FALSE
-        je      type_error
+        je      .type_error
     else if structtype eq String
         cmp     [thedest+NODE.type], STRING
-        jne     type_error
+        jne     .type_error
     else
         cmp     [thedest+NODE.type], CHAR
-        jne     type_error
+        jne     .type_error
     end if
+        jmp     .safe_type
+    .type_error:
+    if structtype eq Number
+        expectedType thedest, NUMBER
+    else if structtype eq String
+        expectedType thedest, STRING
+    else if structtype eq Char
+        expectedType thedest, CHAR
+    else
+        expectedType thedest, ATOM
+    end if
+        jmp     type_error
+    .safe_type:
 }
 
 macro cmpNodeStruct cmptype, structtype {
-    local .start_loop, .end_loop, .return_false, .exit
+    local .start_loop, .end_loop, .return_false, .exit, .argnum_error
         mov     esi, [args]
         mov     eax, [head]
         cmp     esi, 0
-        je      argnum_error
+        je      .argnum_error
         cmp     [esi+NODE.next], eax
-        je      argnum_error
+        je      .argnum_error
         toCheckCmpNode ebx, esi, structtype
     .start_loop:
         mov     edi, [esi+NODE.next]
@@ -1746,6 +1783,9 @@ macro cmpNodeStruct cmptype, structtype {
         jmp     .exit
     .return_false:
         stdcall false
+        jmp     .exit
+    .argnum_error:
+        argnumErrorJump [head], 2
     .exit:
 }
 
@@ -1756,20 +1796,16 @@ macro procCmpsNode cmptype, structtype {
     endp
 }
 
-procCmpsNode less,      Number
-procCmpsNode lessEqual, Number
-procCmpsNode more,      Number
-procCmpsNode moreEqual, Number
+macro makeProcCmpsNode nametype {
+    procCmpsNode less,      nametype
+    procCmpsNode lessEqual, nametype
+    procCmpsNode more,      nametype
+    procCmpsNode moreEqual, nametype
+}
 
-procCmpsNode less,      String
-procCmpsNode lessEqual, String
-procCmpsNode more,      String
-procCmpsNode moreEqual, String
-
-procCmpsNode less,      Char
-procCmpsNode lessEqual, Char
-procCmpsNode more,      Char
-procCmpsNode moreEqual, Char
+makeProcCmpsNode Number
+makeProcCmpsNode String
+makeProcCmpsNode Char
 
 qquotecount dd 0
 proc quasiquote uses esi edi ebx ecx, hQQuote, results, envs
@@ -1780,11 +1816,11 @@ proc quasiquote uses esi edi ebx ecx, hQQuote, results, envs
         mov     esi, [results]
         mov     eax, [hQQuote]
         cmp     esi, 0
-        je      argnum_error
+        je      .argnum_error
         cmp     [esi+NODE.next], 0
-        je      argnum_error
+        je      .argnum_error
         cmp     [esi+NODE.next], eax
-        jne     argnum_error
+        jne     .argnum_error
         stdcall isAtom, esi
         cmp     eax, TRUE
         je      .return_as_is
@@ -1806,6 +1842,8 @@ proc quasiquote uses esi edi ebx ecx, hQQuote, results, envs
     .exit:
         dec     [qquotecount]
         ret
+    .argnum_error:
+        argnumErrorJump [hQQuote], 1
 endp
 
 macro tosamewithname thesrcsym {
@@ -1908,11 +1946,6 @@ proc qqlist uses esi edi ebx ecx edx, elems, envs
         stdcall tobelist, [esi+NODE.value]
         mov     ebx, eax
         stdcall qqlist, [esi+NODE.value], [envs]
-        checkItr ebx
-        checkNode esi
-        checkNode eax
-        checkItr [eax+NODE.type]
-        okexecuted
         cmp     [eax+NODE.type], LIST
         ;je      .proceed_to_next
         je      .no_need_for_list

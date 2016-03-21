@@ -794,6 +794,34 @@ proc cpyChar uses esi edi ebx ecx edx, charstruct
         ret
 endp
 
+macro tocopynumber [thetype] {
+    common x = 0
+    forward x = x + 1
+    common a = 0
+    forward a = a + 1
+    local .next_check
+    if a <> x
+        cmp     edx, thetype
+        jne     .next_check
+    end if
+    if thetype eq INTEGER
+        memalloc 4
+    else
+        memalloc 8
+    end if
+        mov     [edi+NUMBERSTRUCT.value], eax
+        mov     edi, eax
+        mov     esi, [esi+NUMBERSTRUCT.value]
+        movsd
+    if ~ thetype eq INTEGER
+        movsd
+    end if
+    if a <> x
+        jmp     .exit
+    end if
+    .next_check:
+}
+
 proc cpyNumber uses esi edi ebx ecx edx, numstruct
         mov     esi, [numstruct]
         mov     ecx, sizeof.NUMBERSTRUCT
@@ -803,31 +831,7 @@ proc cpyNumber uses esi edi ebx ecx edx, numstruct
         mov     dword [edi+NUMBERSTRUCT.hNumber], eax
         mov     edx, [esi+NUMBERSTRUCT.type]
         mov     dword [edi+NUMBERSTRUCT.type], edx
-        cmp     edx, INTEGER
-        jne     @f
-        memalloc 4
-        mov     dword [edi+NUMBERSTRUCT.value], eax
-        mov     edi, eax
-        mov     esi, [esi+NUMBERSTRUCT.value]
-        movsd
-        jmp     .exit
-    @@:
-        cmp     edx, LONG
-        jne     @f
-        memalloc 8
-        mov     [edi+NUMBERSTRUCT.value], eax
-        mov     edi, eax
-        mov     esi, [esi+NUMBERSTRUCT.value]
-        movsd
-        movsd
-        jmp     .exit
-    @@:
-        memalloc 8
-        mov     [edi+NUMBERSTRUCT.value], eax
-        mov     edi, eax
-        mov     esi, [esi+NUMBERSTRUCT.value]
-        movsd
-        movsd
+        tocopynumber INTEGER, LONG, FLOAT
     .exit:
         mov     eax, ebx
         ret

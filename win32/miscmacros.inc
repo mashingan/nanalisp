@@ -45,7 +45,7 @@ macro clearBuffer thestr, len {
     xor     eax, eax
     rep     stosw
     popad
-
+}
 
 memfmt du 'The memory value is %p',0
 macro memval [theholder] {
@@ -88,6 +88,44 @@ macro checkList [thelist] {
         newline
     common
         popad
+}
+
+expecttypelines du 'Got %s expected %s',0
+macro expectedType thenode, typeintended {
+        pushad
+        mov     ebx, thenode
+        checkNode ebx
+        mov     eax, [ebx+NODE.type]
+        mov     ecx, typeintended
+        lea     eax, [eax*4]
+        lea     ecx, [ecx*4]
+        mov     esi, [datatypeenum+eax]
+        mov     edi, [datatypeenum+ecx]
+        cinvoke wprintf, expecttypelines, esi, edi
+        newline
+        popad
+}
+
+macro typeErrorJump thenode, thetype {
+    .type_error:
+        expectedType thenode, thetype
+        jmp     type_error
+}
+
+expectargnumlines du 'Supplied %d expected %d',0
+macro expectedArgnum thenode, supplied, expected {
+        pushad
+        checkList thenode
+        cinvoke wprintf, expectargnumlines, supplied, expected
+        newline
+        popad
+}
+
+macro argnumErrorJump thenode, expected {
+        stdcall internalLength, thenode
+        dec     eax
+        expectedArgnum thenode, eax, expected
+        jmp     argnum_error
 }
 
 macro inc2 theval {
@@ -171,16 +209,18 @@ macro initProgram {
 
 macro cleanupProgram {
         cleanFUNSTACKTRACE
-        memalloc [hBuffin]
-        memalloc [hDummy]
+        memfree [hBuffin]
+        memfree [hDummy]
         ;invoke  HeapFree, [procHeap], HEAP_NO_SERIALIZE, [FUNSTACKTRACE]
         ;FAILCHK
 }
 
-macro the_error [labels, msgaddr, errtype] {
+macro the_error [labels, errtype] {
     labels:
-        writeLn msgaddr
+        writeLn errtype#text
+        ;mov     eax, errtype
+        ;jmp     finish
         checkFUNSTACKTRACE
-        mov     eax, errtype
-        jmp     finish
+        newline
+        jmp     start.to_finish
 }
